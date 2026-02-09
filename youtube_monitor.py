@@ -1,4 +1,4 @@
-"""Monitor a YouTube channel for new video uploads."""
+"""Monitor YouTube channels for new video uploads."""
 
 import json
 import logging
@@ -47,14 +47,9 @@ def _resolve_channel_id(youtube, handle: str) -> str:
     return channel_id
 
 
-def get_new_videos() -> list[dict]:
-    """Return a list of new (unprocessed) videos from the configured channel.
-
-    Each dict contains: video_id, title, published_at, description.
-    """
-    youtube = build("youtube", "v3", developerKey=config.YOUTUBE_API_KEY)
-
-    channel_id = _resolve_channel_id(youtube, config.YOUTUBE_CHANNEL_HANDLE)
+def _get_new_videos_for_channel(youtube, handle: str, processed: set[str]) -> list[dict]:
+    """Fetch new (unprocessed) videos from a single channel."""
+    channel_id = _resolve_channel_id(youtube, handle)
 
     # Get the uploads playlist
     ch_resp = youtube.channels().list(
@@ -69,9 +64,7 @@ def get_new_videos() -> list[dict]:
         maxResults=10,
     ).execute()
 
-    processed = _load_processed()
     new_videos = []
-
     for item in pl_resp.get("items", []):
         snippet = item["snippet"]
         vid_id = snippet["resourceId"]["videoId"]
@@ -82,7 +75,29 @@ def get_new_videos() -> list[dict]:
             "title": snippet["title"],
             "published_at": snippet["publishedAt"],
             "description": snippet.get("description", ""),
+            "channel": handle,
         })
 
-    logger.info("Found %d new video(s)", len(new_videos))
     return new_videos
+
+
+def get_new_videos() -> list[dict]:
+    """Return new (unprocessed) videos from all configured channels.
+
+    Each dict contains: video_id, title, published_at, description, channel.
+    """
+    youtube = build("youtube", "v3", developerKey=config.YOUTUBE_API_KEY)
+    processed = _load_processed()
+    all_new = []
+
+    for handle in config.YOUTUBE_CHANNELS:
+        try:
+            videos = _get_new_videos_for_channel(youtube, handle, processed)
+            all_new.extend(videos)
+            logger.info("@%s: %d new video(s)", handle, len(videos))
+        except Exception:
+            logger.exception("Error checking channel @%s", handle)
+
+    logger.info("Total: %d new video(s) across %d channel(s)",
+                len(all_new), len(config.YOUTUBE_CHANNELS))
+    return all_new

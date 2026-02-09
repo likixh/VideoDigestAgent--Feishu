@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """YouTube Stock Analysis Summarizer — main entry point.
 
-Monitors a YouTube channel for new videos, extracts transcripts,
-generates structured stock analysis summaries using Claude,
+Monitors YouTube channels for new videos, extracts transcripts,
+generates structured stock analysis summaries using your chosen LLM,
 and emails them to you.
 
 Usage:
@@ -33,8 +33,9 @@ def process_video(video: dict) -> None:
     """Process a single video: extract transcript, summarize, email, mark done."""
     vid_id = video["video_id"]
     title = video["title"]
+    channel = video.get("channel", "unknown")
 
-    logger.info("Processing: %s (%s)", title, vid_id)
+    logger.info("Processing: %s (%s) from @%s", title, vid_id, channel)
 
     try:
         transcript = get_transcript(vid_id)
@@ -44,7 +45,7 @@ def process_video(video: dict) -> None:
 
     summary = summarize(title, transcript)
 
-    send_summary_email(title, vid_id, summary)
+    send_summary_email(title, vid_id, summary, channel)
 
     mark_processed(vid_id)
     logger.info("Done processing: %s", title)
@@ -70,6 +71,10 @@ def run_poll() -> None:
         config.POLL_INTERVAL,
         config.POLL_INTERVAL // 60,
     )
+    logger.info("Monitoring channels: %s", ", ".join(
+        f"@{ch}" for ch in config.YOUTUBE_CHANNELS
+    ))
+    logger.info("LLM provider: %s", config.LLM_PROVIDER)
     while True:
         try:
             run_once()
@@ -84,8 +89,8 @@ def run_single_video(video_id: str) -> None:
     video = {
         "video_id": video_id,
         "title": f"Video {video_id}",
+        "channel": "test",
     }
-    # Try to get the real title from the transcript metadata
     process_video(video)
 
 

@@ -1,6 +1,6 @@
 # YouTube Stock Analysis Summarizer
 
-Automatically monitors a YouTube channel (default: [@RhinoFinance](https://www.youtube.com/@RhinoFinance)) for new videos, extracts transcripts, generates detailed stock analysis summaries using Google Gemini AI (free!), and emails them to you.
+Automatically monitors YouTube channels for new videos, extracts transcripts, generates detailed stock analysis summaries using your choice of LLM (Gemini, OpenAI, or Claude), and emails them to you.
 
 ## What You Get
 
@@ -15,7 +15,7 @@ Each email summary includes:
 
 ### 1. Get API Keys
 
-#### YouTube Data API v3 Key
+#### YouTube Data API v3 Key (required)
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project (or select an existing one)
 3. Go to **APIs & Services > Library**
@@ -25,12 +25,13 @@ Each email summary includes:
 7. Copy the key — this is your `YOUTUBE_API_KEY`
 8. (Recommended) Click **Restrict Key** and limit it to YouTube Data API v3 only
 
-#### Google Gemini API Key (free)
-1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
-2. Sign in with your Google account
-3. Click **Create API Key**
-4. Copy the key — this is your `GEMINI_API_KEY`
-5. That's it — the free tier gives you 15 requests/minute, more than enough
+#### LLM API Key (choose one)
+
+| Provider | Cost | How to get the key |
+|----------|------|--------------------|
+| **Gemini** (recommended) | Free tier | Go to [Google AI Studio](https://aistudio.google.com/apikey) → Create API Key |
+| **OpenAI** | ~$0.01-0.05/video | Go to [OpenAI Platform](https://platform.openai.com/api-keys) → Create new secret key |
+| **Anthropic (Claude)** | ~$0.01-0.03/video | Go to [Anthropic Console](https://console.anthropic.com/) → API Keys → Create Key |
 
 #### Gmail App Password (for sending emails)
 1. Go to [Google Account Security](https://myaccount.google.com/security)
@@ -44,7 +45,7 @@ Each email summary includes:
 ### 2. Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 ### 3. Configure Environment
@@ -56,35 +57,70 @@ cp .env.example .env
 Edit `.env` with your actual values:
 
 ```env
+# Add your YouTube channels (comma-separated, without @)
+YOUTUBE_CHANNELS=RhinoFinance,MeetKevin,StockMoe
+
 YOUTUBE_API_KEY=AIza...
+
+# Pick your LLM: gemini, openai, or anthropic
+LLM_PROVIDER=gemini
 GEMINI_API_KEY=AIza...
-YOUTUBE_CHANNEL_HANDLE=RhinoFinance
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
+
+# Email
 SENDER_EMAIL=you@gmail.com
 SENDER_PASSWORD=abcd efgh ijkl mnop
 RECIPIENT_EMAIL=you@gmail.com
-POLL_INTERVAL=3600
 ```
 
 ## Usage
 
 ### Check once for new videos
 ```bash
-python main.py
+python3 main.py
 ```
 
 ### Run continuously (checks every hour)
 ```bash
-python main.py --poll
+python3 main.py --poll
 ```
 
 ### Test with a specific video
 ```bash
-python main.py --video dQw4w9WgXcQ
+python3 main.py --video dQw4w9WgXcQ
 ```
 
+## Configuration Reference
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `YOUTUBE_CHANNELS` | Yes | — | Comma-separated channel handles (without @) |
+| `YOUTUBE_API_KEY` | Yes | — | YouTube Data API v3 key |
+| `LLM_PROVIDER` | No | `gemini` | LLM to use: `gemini`, `openai`, or `anthropic` |
+| `GEMINI_API_KEY` | If gemini | — | Google Gemini API key |
+| `GEMINI_MODEL` | No | `gemini-2.0-flash` | Gemini model to use |
+| `OPENAI_API_KEY` | If openai | — | OpenAI API key |
+| `OPENAI_MODEL` | No | `gpt-4o-mini` | OpenAI model to use |
+| `ANTHROPIC_API_KEY` | If anthropic | — | Anthropic API key |
+| `ANTHROPIC_MODEL` | No | `claude-sonnet-4-5-20250929` | Claude model to use |
+| `SMTP_SERVER` | No | `smtp.gmail.com` | SMTP server |
+| `SMTP_PORT` | No | `587` | SMTP port |
+| `SENDER_EMAIL` | Yes | — | Email to send from |
+| `SENDER_PASSWORD` | Yes | — | SMTP password / app password |
+| `RECIPIENT_EMAIL` | Yes | — | Email to send summaries to |
+| `POLL_INTERVAL` | No | `3600` | Seconds between checks |
+
 ## Run as a Background Service (Optional)
+
+### Using cron (simplest)
+
+```bash
+crontab -e
+```
+
+Add this line to check every hour:
+```
+0 * * * * cd /path/to/youtubersummary && /usr/bin/python3 main.py >> /tmp/yt-summarizer.log 2>&1
+```
 
 ### Using systemd (Linux)
 
@@ -112,30 +148,21 @@ sudo systemctl enable yt-summarizer
 sudo systemctl start yt-summarizer
 ```
 
-### Using cron (simpler alternative)
-
-```bash
-crontab -e
-```
-
-Add this line to check every hour:
-```
-0 * * * * cd /path/to/youtubersummary && /usr/bin/python3 main.py >> /var/log/yt-summarizer.log 2>&1
-```
-
 ## Architecture
 
 ```
 main.py                  — Orchestrator: CLI + polling loop
-youtube_monitor.py       — Detects new uploads via YouTube Data API
+youtube_monitor.py       — Detects new uploads via YouTube Data API (multi-channel)
 transcript_extractor.py  — Extracts video captions via youtube-transcript-api
-summarizer.py            — Sends transcript to Gemini for structured analysis
+summarizer.py            — Pluggable LLM backend (Gemini / OpenAI / Claude)
 emailer.py               — Formats and sends summary email via SMTP
 config.py                — Loads settings from .env
 ```
 
 ## Cost Estimate
 
-- **YouTube Data API**: Free tier gives 10,000 units/day. Each poll uses ~4 units, so ~2,500 checks/day (way more than needed).
+- **YouTube Data API**: Free tier gives 10,000 units/day. Each poll uses ~4 units per channel.
 - **Gemini API**: Free! The free tier is more than sufficient for this use case.
+- **OpenAI API**: ~$0.01-0.05 per video (using gpt-4o-mini).
+- **Anthropic API**: ~$0.01-0.03 per video (using Claude Sonnet).
 - **Email**: Free via Gmail SMTP.

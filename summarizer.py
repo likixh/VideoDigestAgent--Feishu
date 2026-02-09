@@ -1,8 +1,6 @@
-"""Summarize YouTube video transcripts using Google Gemini."""
+"""Summarize YouTube video transcripts using a configurable LLM provider."""
 
 import logging
-
-import google.generativeai as genai
 
 import config
 
@@ -43,24 +41,67 @@ and data points, not generic filler.\
 """
 
 
-def summarize(video_title: str, transcript: str) -> str:
-    """Send the transcript to Gemini and return a structured stock analysis summary."""
-    genai.configure(api_key=config.GEMINI_API_KEY)
+def _summarize_gemini(user_message: str) -> str:
+    import google.generativeai as genai
 
+    genai.configure(api_key=config.GEMINI_API_KEY)
     model = genai.GenerativeModel(
-        model_name="gemini-2.0-flash",
+        model_name=config.GEMINI_MODEL,
         system_instruction=SYSTEM_PROMPT,
     )
+    response = model.generate_content(user_message)
+    return response.text
 
+
+def _summarize_openai(user_message: str) -> str:
+    from openai import OpenAI
+
+    client = OpenAI(api_key=config.OPENAI_API_KEY)
+    response = client.chat.completions.create(
+        model=config.OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
+    )
+    return response.choices[0].message.content
+
+
+def _summarize_anthropic(user_message: str) -> str:
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+    response = client.messages.create(
+        model=config.ANTHROPIC_MODEL,
+        max_tokens=4096,
+        system=SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_message}],
+    )
+    return response.content[0].text
+
+
+_PROVIDERS = {
+    "gemini": _summarize_gemini,
+    "openai": _summarize_openai,
+    "anthropic": _summarize_anthropic,
+}
+
+
+def summarize(video_title: str, transcript: str) -> str:
+    """Send the transcript to the configured LLM and return a structured summary."""
     user_message = (
         f"Video title: {video_title}\n\n"
         f"Transcript:\n{transcript}"
     )
 
-    logger.info("Sending transcript to Gemini for summarization (%d chars)", len(transcript))
+    provider = config.LLM_PROVIDER
+    logger.info(
+        "Sending transcript to %s for summarization (%d chars)",
+        provider, len(transcript),
+    )
 
-    response = model.generate_content(user_message)
+    summarize_fn = _PROVIDERS[provider]
+    summary = summarize_fn(user_message)
 
-    summary = response.text
     logger.info("Received summary (%d chars)", len(summary))
     return summary
