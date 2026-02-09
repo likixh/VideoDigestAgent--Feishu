@@ -4,3 +4,4 @@ __pycache__/
 processed_videos.json
 venv/
 .venv/
+audio_tmp/

@@ -1,6 +1,8 @@
 youtube-transcript-api>=0.6.3
 google-api-python-client>=2.160.0
 python-dotenv>=1.0.1
+yt-dlp>=2024.1.0
+openai-whisper>=20231117
 
 # LLM providers — install the one you plan to use:
 google-generativeai>=0.8.0   # for LLM_PROVIDER=gemini (free tier)

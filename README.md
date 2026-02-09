@@ -45,8 +45,13 @@ Each email summary includes:
 ### 2. Install Dependencies
 
 ```bash
+# Required for Whisper audio fallback (Mac)
+brew install ffmpeg
+
 pip3 install -r requirements.txt
 ```
+
+> **Note:** `ffmpeg` is only needed if a video has no captions and Whisper kicks in. The app tries YouTube captions first (instant), and only downloads + transcribes audio as a fallback.
 
 ### 3. Configure Environment
 
@@ -153,7 +158,7 @@ sudo systemctl start yt-summarizer
 ```
 main.py                  — Orchestrator: CLI + polling loop
 youtube_monitor.py       — Detects new uploads via YouTube Data API (multi-channel)
-transcript_extractor.py  — Extracts video captions via youtube-transcript-api
+transcript_extractor.py  — Extracts captions (YouTube API → Whisper fallback)
 summarizer.py            — Pluggable LLM backend (Gemini / OpenAI / Claude)
 emailer.py               — Formats and sends summary email via SMTP
 config.py                — Loads settings from .env
