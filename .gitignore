@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.pyc
+processed_videos.json
+venv/
+.venv/
