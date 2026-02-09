@@ -13,7 +13,8 @@ def get_transcript(video_id: str) -> str:
     Tries English captions first, then falls back to any available language.
     """
     try:
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        ytt = YouTubeTranscriptApi()
+        transcript_list = ytt.list(video_id)
 
         # Try English first
         try:
