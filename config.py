@@ -12,7 +12,7 @@ def _require(var: str) -> str:
 
 
 YOUTUBE_API_KEY = _require("YOUTUBE_API_KEY")
-ANTHROPIC_API_KEY = _require("ANTHROPIC_API_KEY")
+GEMINI_API_KEY = _require("GEMINI_API_KEY")
 YOUTUBE_CHANNEL_HANDLE = os.getenv("YOUTUBE_CHANNEL_HANDLE", "RhinoFinance")
 
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")

@@ -1,8 +1,8 @@
-"""Summarize YouTube video transcripts using Claude."""
+"""Summarize YouTube video transcripts using Google Gemini."""
 
 import logging
 
-import anthropic
+import google.generativeai as genai
 
 import config
 
@@ -44,24 +44,23 @@ and data points, not generic filler.\
 
 
 def summarize(video_title: str, transcript: str) -> str:
-    """Send the transcript to Claude and return a structured stock analysis summary."""
-    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+    """Send the transcript to Gemini and return a structured stock analysis summary."""
+    genai.configure(api_key=config.GEMINI_API_KEY)
+
+    model = genai.GenerativeModel(
+        model_name="gemini-2.0-flash",
+        system_instruction=SYSTEM_PROMPT,
+    )
 
     user_message = (
         f"Video title: {video_title}\n\n"
         f"Transcript:\n{transcript}"
     )
 
-    # Claude supports up to 200k tokens of input — a 30-min transcript is ~5-8k words
-    logger.info("Sending transcript to Claude for summarization (%d chars)", len(transcript))
+    logger.info("Sending transcript to Gemini for summarization (%d chars)", len(transcript))
 
-    response = client.messages.create(
-        model="claude-sonnet-4-5-20250929",
-        max_tokens=4096,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_message}],
-    )
+    response = model.generate_content(user_message)
 
-    summary = response.content[0].text
+    summary = response.text
     logger.info("Received summary (%d chars)", len(summary))
     return summary

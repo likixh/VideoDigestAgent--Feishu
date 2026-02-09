@@ -1,6 +1,6 @@
 # YouTube Stock Analysis Summarizer
 
-Automatically monitors a YouTube channel (default: [@RhinoFinance](https://www.youtube.com/@RhinoFinance)) for new videos, extracts transcripts, generates detailed stock analysis summaries using Claude AI, and emails them to you.
+Automatically monitors a YouTube channel (default: [@RhinoFinance](https://www.youtube.com/@RhinoFinance)) for new videos, extracts transcripts, generates detailed stock analysis summaries using Google Gemini AI (free!), and emails them to you.
 
 ## What You Get
 
@@ -25,13 +25,12 @@ Each email summary includes:
 7. Copy the key — this is your `YOUTUBE_API_KEY`
 8. (Recommended) Click **Restrict Key** and limit it to YouTube Data API v3 only
 
-#### Anthropic API Key (Claude)
-1. Go to [Anthropic Console](https://console.anthropic.com/)
-2. Sign up or log in
-3. Go to **API Keys**
-4. Click **Create Key**
-5. Copy the key — this is your `ANTHROPIC_API_KEY`
-6. Add credits to your account under **Billing** (summarizing one 30-min video costs ~$0.01-0.03)
+#### Google Gemini API Key (free)
+1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
+2. Sign in with your Google account
+3. Click **Create API Key**
+4. Copy the key — this is your `GEMINI_API_KEY`
+5. That's it — the free tier gives you 15 requests/minute, more than enough
 
 #### Gmail App Password (for sending emails)
 1. Go to [Google Account Security](https://myaccount.google.com/security)
@@ -58,7 +57,7 @@ Edit `.env` with your actual values:
 
 ```env
 YOUTUBE_API_KEY=AIza...
-ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=AIza...
 YOUTUBE_CHANNEL_HANDLE=RhinoFinance
 SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
@@ -130,7 +129,7 @@ Add this line to check every hour:
 main.py                  — Orchestrator: CLI + polling loop
 youtube_monitor.py       — Detects new uploads via YouTube Data API
 transcript_extractor.py  — Extracts video captions via youtube-transcript-api
-summarizer.py            — Sends transcript to Claude for structured analysis
+summarizer.py            — Sends transcript to Gemini for structured analysis
 emailer.py               — Formats and sends summary email via SMTP
 config.py                — Loads settings from .env
 ```
@@ -138,5 +137,5 @@ config.py                — Loads settings from .env
 ## Cost Estimate
 
 - **YouTube Data API**: Free tier gives 10,000 units/day. Each poll uses ~4 units, so ~2,500 checks/day (way more than needed).
-- **Anthropic API**: ~$0.01-0.03 per 30-min video summary (using Claude Sonnet).
+- **Gemini API**: Free! The free tier is more than sufficient for this use case.
 - **Email**: Free via Gmail SMTP.
