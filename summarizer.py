@@ -42,14 +42,17 @@ and data points, not generic filler.\
 
 
 def _summarize_gemini(user_message: str) -> str:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
 
-    genai.configure(api_key=config.GEMINI_API_KEY)
-    model = genai.GenerativeModel(
-        model_name=config.GEMINI_MODEL,
-        system_instruction=SYSTEM_PROMPT,
+    client = genai.Client(api_key=config.GEMINI_API_KEY)
+    response = client.models.generate_content(
+        model=config.GEMINI_MODEL,
+        contents=user_message,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+        ),
     )
-    response = model.generate_content(user_message)
     return response.text
 
 
