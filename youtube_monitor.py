@@ -57,11 +57,11 @@ def _get_new_videos_for_channel(youtube, handle: str, processed: set[str]) -> li
     ).execute()
     uploads_playlist = ch_resp["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
 
-    # Fetch the most recent 10 uploads
+    # Fetch the most recent upload only
     pl_resp = youtube.playlistItems().list(
         part="snippet",
         playlistId=uploads_playlist,
-        maxResults=10,
+        maxResults=1,
     ).execute()
 
     new_videos = []
@@ -102,7 +102,7 @@ def initialize() -> None:
             pl_resp = youtube.playlistItems().list(
                 part="snippet",
                 playlistId=uploads_playlist,
-                maxResults=10,
+                maxResults=1,
             ).execute()
 
             for item in pl_resp.get("items", []):
