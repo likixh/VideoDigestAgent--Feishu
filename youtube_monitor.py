@@ -81,11 +81,50 @@ def _get_new_videos_for_channel(youtube, handle: str, processed: set[str]) -> li
     return new_videos
 
 
+def initialize() -> None:
+    """First-run setup: mark all existing videos as processed so we only
+    pick up truly new uploads going forward."""
+    if os.path.exists(config.PROCESSED_VIDEOS_FILE):
+        return  # Already initialized
+
+    logger.info("First run detected — marking existing videos as seen...")
+    youtube = build("youtube", "v3", developerKey=config.YOUTUBE_API_KEY)
+    all_ids: set[str] = set()
+
+    for handle in config.YOUTUBE_CHANNELS:
+        try:
+            channel_id = _resolve_channel_id(youtube, handle)
+            ch_resp = youtube.channels().list(
+                part="contentDetails", id=channel_id
+            ).execute()
+            uploads_playlist = ch_resp["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
+
+            pl_resp = youtube.playlistItems().list(
+                part="snippet",
+                playlistId=uploads_playlist,
+                maxResults=10,
+            ).execute()
+
+            for item in pl_resp.get("items", []):
+                vid_id = item["snippet"]["resourceId"]["videoId"]
+                all_ids.add(vid_id)
+
+            logger.info("@%s: marked %d existing video(s) as seen",
+                        handle, len(pl_resp.get("items", [])))
+        except Exception:
+            logger.exception("Error initializing channel @%s", handle)
+
+    _save_processed(all_ids)
+    logger.info("Initialization complete. Will only process new uploads from now on.")
+
+
 def get_new_videos() -> list[dict]:
     """Return new (unprocessed) videos from all configured channels.
 
     Each dict contains: video_id, title, published_at, description, channel.
     """
+    initialize()
+
     youtube = build("youtube", "v3", developerKey=config.YOUTUBE_API_KEY)
     processed = _load_processed()
     all_new = []
