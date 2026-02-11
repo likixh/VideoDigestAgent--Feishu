@@ -43,9 +43,9 @@ def process_video(video: dict) -> None:
         logger.warning("Skipping %s — %s", vid_id, e)
         return
 
-    summary = summarize(title, transcript)
+    summaries = summarize(title, transcript)
 
-    send_summary_email(title, vid_id, summary, channel)
+    send_summary_email(title, vid_id, summaries, channel)
 
     mark_processed(vid_id)
     logger.info("Done processing: %s", title)

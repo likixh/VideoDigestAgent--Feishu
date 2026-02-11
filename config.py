@@ -53,6 +53,12 @@ else:
         "Choose from: gemini, openai, anthropic"
     )
 
+# ── Summary Languages ────────────────────────────────────
+_raw_langs = os.getenv("SUMMARY_LANGUAGES", "English")
+SUMMARY_LANGUAGES: list[str] = [
+    lang.strip() for lang in _raw_langs.split(",") if lang.strip()
+][:2]  # max 2 languages
+
 # ── Email ────────────────────────────────────────────────
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))

@@ -52,7 +52,16 @@ and data points, not generic filler.\
 """
 
 
-def _summarize_gemini(user_message: str) -> str:
+def _build_system_prompt(language: str) -> str:
+    lang_instruction = (
+        f"\n\nIMPORTANT: Write the ENTIRE summary in {language}. "
+        f"Keep stock tickers in their original form (e.g. AAPL, TSLA) "
+        f"but write all analysis, headings, and descriptions in {language}."
+    )
+    return SYSTEM_PROMPT + lang_instruction
+
+
+def _summarize_gemini(user_message: str, language: str) -> str:
     from google import genai
     from google.genai import types
 
@@ -61,34 +70,34 @@ def _summarize_gemini(user_message: str) -> str:
         model=config.GEMINI_MODEL,
         contents=user_message,
         config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=_build_system_prompt(language),
         ),
     )
     return response.text
 
 
-def _summarize_openai(user_message: str) -> str:
+def _summarize_openai(user_message: str, language: str) -> str:
     from openai import OpenAI
 
     client = OpenAI(api_key=config.OPENAI_API_KEY)
     response = client.chat.completions.create(
         model=config.OPENAI_MODEL,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": _build_system_prompt(language)},
             {"role": "user", "content": user_message},
         ],
     )
     return response.choices[0].message.content
 
 
-def _summarize_anthropic(user_message: str) -> str:
+def _summarize_anthropic(user_message: str, language: str) -> str:
     import anthropic
 
     client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
     response = client.messages.create(
         model=config.ANTHROPIC_MODEL,
         max_tokens=4096,
-        system=SYSTEM_PROMPT,
+        system=_build_system_prompt(language),
         messages=[{"role": "user", "content": user_message}],
     )
     return response.content[0].text
@@ -101,21 +110,24 @@ _PROVIDERS = {
 }
 
 
-def summarize(video_title: str, transcript: str) -> str:
-    """Send the transcript to the configured LLM and return a structured summary."""
+def summarize(video_title: str, transcript: str) -> dict[str, str]:
+    """Summarize in each configured language. Returns {language: summary}."""
     user_message = (
         f"Video title: {video_title}\n\n"
         f"Transcript:\n{transcript}"
     )
 
     provider = config.LLM_PROVIDER
-    logger.info(
-        "Sending transcript to %s for summarization (%d chars)",
-        provider, len(transcript),
-    )
-
     summarize_fn = _PROVIDERS[provider]
-    summary = summarize_fn(user_message)
+    summaries = {}
 
-    logger.info("Received summary (%d chars)", len(summary))
-    return summary
+    for lang in config.SUMMARY_LANGUAGES:
+        logger.info(
+            "Sending transcript to %s for %s summary (%d chars)",
+            provider, lang, len(transcript),
+        )
+        summary = summarize_fn(user_message, lang)
+        logger.info("Received %s summary (%d chars)", lang, len(summary))
+        summaries[lang] = summary
+
+    return summaries
