@@ -1,32 +1,14 @@
 """Monitor YouTube channels for new video uploads."""
 
-import json
 import logging
 import os
 
 from googleapiclient.discovery import build
 
 import config
+from history import get_processed_ids, mark_seen
 
 logger = logging.getLogger(__name__)
-
-
-def _load_processed() -> set[str]:
-    if os.path.exists(config.PROCESSED_VIDEOS_FILE):
-        with open(config.PROCESSED_VIDEOS_FILE, "r") as f:
-            return set(json.load(f))
-    return set()
-
-
-def _save_processed(video_ids: set[str]) -> None:
-    with open(config.PROCESSED_VIDEOS_FILE, "w") as f:
-        json.dump(sorted(video_ids), f, indent=2)
-
-
-def mark_processed(video_id: str) -> None:
-    processed = _load_processed()
-    processed.add(video_id)
-    _save_processed(processed)
 
 
 def _resolve_channel_id(youtube, handle: str) -> str:
@@ -89,7 +71,6 @@ def initialize() -> None:
 
     logger.info("First run detected — marking existing videos as seen...")
     youtube = build("youtube", "v3", developerKey=config.YOUTUBE_API_KEY)
-    all_ids: set[str] = set()
 
     for handle in config.YOUTUBE_CHANNELS:
         try:
@@ -107,14 +88,13 @@ def initialize() -> None:
 
             for item in pl_resp.get("items", []):
                 vid_id = item["snippet"]["resourceId"]["videoId"]
-                all_ids.add(vid_id)
+                mark_seen(vid_id)
 
             logger.info("@%s: marked %d existing video(s) as seen",
                         handle, len(pl_resp.get("items", [])))
         except Exception:
             logger.exception("Error initializing channel @%s", handle)
 
-    _save_processed(all_ids)
     logger.info("Initialization complete. Will only process new uploads from now on.")
 
 
@@ -126,7 +106,7 @@ def get_new_videos() -> list[dict]:
     initialize()
 
     youtube = build("youtube", "v3", developerKey=config.YOUTUBE_API_KEY)
-    processed = _load_processed()
+    processed = get_processed_ids()
     all_new = []
 
     for handle in config.YOUTUBE_CHANNELS:

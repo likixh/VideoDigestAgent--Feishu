@@ -5,3 +5,4 @@ processed_videos.json
 venv/
 .venv/
 audio_tmp/
+summaries/
