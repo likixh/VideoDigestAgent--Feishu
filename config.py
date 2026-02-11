@@ -59,6 +59,9 @@ SUMMARY_LANGUAGES: list[str] = [
     lang.strip() for lang in _raw_langs.split(",") if lang.strip()
 ][:2]  # max 2 languages
 
+# ── Verification ─────────────────────────────────────────
+VERIFY_SUMMARY = os.getenv("VERIFY_SUMMARY", "false").lower() in ("true", "1", "yes")
+
 # ── Email ────────────────────────────────────────────────
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))

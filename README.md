@@ -1,15 +1,30 @@
-# YouTube Stock Analysis Summarizer
+# YouTube Video Summarizer
 
-Automatically monitors YouTube channels for new videos, extracts transcripts, generates detailed stock analysis summaries using your choice of LLM (Gemini, OpenAI, or Claude), and emails them to you.
+Automatically monitors YouTube channels for new videos, extracts transcripts, **auto-detects the content type** (stocks, crypto, podcast, tech review, education, news, etc.), generates tailored summaries using your choice of LLM (Gemini, OpenAI, or Claude), and emails them to you.
 
-## What You Get
+## How It Works
 
-Each email summary includes:
-- **Overall Market Sentiment** — the creator's general market outlook
-- **Stock Tickers Mentioned** — every ticker discussed with a one-liner
-- **Detailed Stock Analysis** — bull/bear thesis, price targets, key takeaways per stock
-- **Other Key Information** — macro data, sector trends, catalysts
-- **TL;DR** — 3-5 sentence executive summary
+The app uses an **agent-based pipeline** to produce accurate, content-aware summaries:
+
+```
+1. CLASSIFY  — Detects video type (stock analysis? podcast? tutorial?)
+2. PROMPT    — Selects the best summary template for that content type
+3. SUMMARIZE — Generates a structured summary via LLM
+4. VERIFY    — (Optional) Second LLM pass to catch errors & hallucinations
+```
+
+## Supported Content Types
+
+| Type | What you get |
+|------|-------------|
+| **Stock Analysis** | Sentiment score, tickers, bull/bear thesis, price targets, conviction levels |
+| **Macro Economics** | Economic outlook, indicators, central bank commentary, sector views |
+| **Crypto** | Market sentiment, token analysis, on-chain signals |
+| **Podcast/Interview** | Guest bios, discussion points, notable quotes, contrarian views |
+| **Tech Review** | Specs, pros/cons, comparisons, verdict |
+| **Educational** | Core concepts, step-by-step process, pitfalls, key takeaways |
+| **News** | Key facts, perspectives, implications |
+| **General** | Auto-structured summary adapted to content |
 
 ## Setup
 
@@ -30,8 +45,8 @@ Each email summary includes:
 | Provider | Cost | How to get the key |
 |----------|------|--------------------|
 | **Gemini** (recommended) | Free tier | Go to [Google AI Studio](https://aistudio.google.com/apikey) → Create API Key |
-| **OpenAI** | ~$0.01-0.05/video | Go to [OpenAI Platform](https://platform.openai.com/api-keys) → Create new secret key |
-| **Anthropic (Claude)** | ~$0.01-0.03/video | Go to [Anthropic Console](https://console.anthropic.com/) → API Keys → Create Key |
+| **OpenAI** | ~$0.02-0.10/video | Go to [OpenAI Platform](https://platform.openai.com/api-keys) → Create new secret key |
+| **Anthropic (Claude)** | ~$0.02-0.06/video | Go to [Anthropic Console](https://console.anthropic.com/) → API Keys → Create Key |
 
 #### Gmail App Password (for sending emails)
 1. Go to [Google Account Security](https://myaccount.google.com/security)
@@ -63,13 +78,19 @@ Edit `.env` with your actual values:
 
 ```env
 # Add your YouTube channels (comma-separated, without @)
-YOUTUBE_CHANNELS=RhinoFinance,MeetKevin,StockMoe
+YOUTUBE_CHANNELS=RhinoFinance,MeetKevin,MrBeast
 
 YOUTUBE_API_KEY=AIza...
 
 # Pick your LLM: gemini, openai, or anthropic
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=AIza...
+
+# Summary languages (up to 2)
+SUMMARY_LANGUAGES=English,Chinese
+
+# Verify accuracy with a second LLM pass (optional)
+VERIFY_SUMMARY=false
 
 # Email
 SENDER_EMAIL=you@gmail.com
@@ -107,6 +128,8 @@ python3 main.py --video dQw4w9WgXcQ
 | `OPENAI_MODEL` | No | `gpt-4o-mini` | OpenAI model to use |
 | `ANTHROPIC_API_KEY` | If anthropic | — | Anthropic API key |
 | `ANTHROPIC_MODEL` | No | `claude-sonnet-4-5-20250929` | Claude model to use |
+| `SUMMARY_LANGUAGES` | No | `English` | Up to 2 languages, comma-separated |
+| `VERIFY_SUMMARY` | No | `false` | Enable accuracy verification pass |
 | `SMTP_SERVER` | No | `smtp.gmail.com` | SMTP server |
 | `SMTP_PORT` | No | `587` | SMTP port |
 | `SENDER_EMAIL` | Yes | — | Email to send from |
@@ -133,7 +156,7 @@ Create `/etc/systemd/system/yt-summarizer.service`:
 
 ```ini
 [Unit]
-Description=YouTube Stock Analysis Summarizer
+Description=YouTube Video Summarizer
 After=network.target
 
 [Service]
@@ -159,15 +182,20 @@ sudo systemctl start yt-summarizer
 main.py                  — Orchestrator: CLI + polling loop
 youtube_monitor.py       — Detects new uploads via YouTube Data API (multi-channel)
 transcript_extractor.py  — Extracts captions (YouTube API → Whisper fallback)
-summarizer.py            — Pluggable LLM backend (Gemini / OpenAI / Claude)
+summarizer.py            — Agent pipeline: classify → prompt → summarize → verify
 emailer.py               — Formats and sends summary email via SMTP
 config.py                — Loads settings from .env
 ```
 
 ## Cost Estimate
 
-- **YouTube Data API**: Free tier gives 10,000 units/day. Each poll uses ~4 units per channel.
-- **Gemini API**: Free! The free tier is more than sufficient for this use case.
-- **OpenAI API**: ~$0.01-0.05 per video (using gpt-4o-mini).
-- **Anthropic API**: ~$0.01-0.03 per video (using Claude Sonnet).
-- **Email**: Free via Gmail SMTP.
+Each video goes through 2-3 LLM calls (classify + summarize, optionally + verify):
+
+| | Gemini | OpenAI | Anthropic |
+|---|---|---|---|
+| Without verification | Free | ~$0.02/video | ~$0.02/video |
+| With verification | Free | ~$0.04/video | ~$0.04/video |
+| Per extra language | Free | ~$0.02/video | ~$0.02/video |
+
+- **YouTube Data API**: Free tier (10,000 units/day, each poll ~4 units/channel)
+- **Email**: Free via Gmail SMTP

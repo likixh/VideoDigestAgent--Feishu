@@ -50,7 +50,7 @@ def send_summary_email(
     video_url = f"https://www.youtube.com/watch?v={video_id}"
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"[@{channel}] New Stock Analysis: {video_title}"
+    msg["Subject"] = f"[@{channel}] New Video Summary: {video_title}"
     msg["From"] = config.SENDER_EMAIL
     msg["To"] = config.RECIPIENT_EMAIL
 
@@ -80,7 +80,7 @@ def send_summary_email(
 <html>
 <body style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
   <div style="background: #1a1a2e; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
-    <h1 style="margin: 0; font-size: 18px;">New Stock Analysis Video</h1>
+    <h1 style="margin: 0; font-size: 18px;">New Video Summary</h1>
     <p style="margin: 8px 0 0 0; color: #ccc;">from @{channel}</p>
   </div>
   <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
