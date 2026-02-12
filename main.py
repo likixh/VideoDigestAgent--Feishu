@@ -117,14 +117,14 @@ def process_video(video: dict, dry_run: bool = False) -> None:
         return False
 
     try:
-        summaries = summarize(title, transcript)
+        summaries, content_type = summarize(title, transcript)
     except Exception as e:
         logger.error("Summarization failed for %s: %s", vid_id, e)
         mark_failed(vid_id, title, channel, str(e))
         return False
 
     try:
-        send_summary_email(title, vid_id, summaries, channel)
+        send_summary_email(title, vid_id, summaries, channel, content_type)
     except Exception as e:
         logger.error("Email failed for %s: %s", vid_id, e)
         mark_failed(vid_id, title, channel, f"email: {e}")
