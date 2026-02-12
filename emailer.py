@@ -2,6 +2,7 @@
 
 import logging
 import smtplib
+from email import policy as email_policy
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -105,6 +106,7 @@ def send_summary_email(
     """Send an email with summaries in all configured languages."""
     video_title = _sanitize(video_title)
     channel = _sanitize(channel)
+    summaries = {lang: _sanitize(text) for lang, text in summaries.items()}
     video_url = f"https://www.youtube.com/watch?v={video_id}"
     thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
     badge_label = _content_type_label(content_type)
@@ -194,6 +196,10 @@ def send_summary_email(
     with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT) as server:
         server.starttls()
         server.login(config.SENDER_EMAIL, config.SENDER_PASSWORD)
-        server.send_message(msg)
+        server.sendmail(
+            config.SENDER_EMAIL,
+            recipients,
+            msg.as_bytes(policy=email_policy.SMTP),
+        )
 
     logger.info("Email sent successfully")
