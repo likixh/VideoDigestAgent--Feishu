@@ -178,14 +178,14 @@ def send_summary_email(
 </body>
 </html>"""
 
-    msg.attach(MIMEText(text_body, "plain"))
-    msg.attach(MIMEText(html_body, "html"))
+    msg.attach(MIMEText(text_body, "plain", "utf-8"))
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     logger.info("Sending email to %s", ", ".join(recipients))
 
     with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT) as server:
         server.starttls()
         server.login(config.SENDER_EMAIL, config.SENDER_PASSWORD)
-        server.sendmail(config.SENDER_EMAIL, recipients, msg.as_string())
+        server.send_message(msg)
 
     logger.info("Email sent successfully")
