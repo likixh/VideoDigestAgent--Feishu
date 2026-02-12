@@ -89,6 +89,11 @@ def _content_type_label(content_type: str) -> str:
     return labels.get(content_type, content_type.replace("_", " ").title())
 
 
+def _sanitize(text: str) -> str:
+    """Replace non-breaking spaces and other problematic whitespace with regular spaces."""
+    return text.replace("\xa0", " ")
+
+
 def send_summary_email(
     video_title: str,
     video_id: str,
@@ -98,6 +103,8 @@ def send_summary_email(
     published_at: str = "",
 ) -> None:
     """Send an email with summaries in all configured languages."""
+    video_title = _sanitize(video_title)
+    channel = _sanitize(channel)
     video_url = f"https://www.youtube.com/watch?v={video_id}"
     thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
     badge_label = _content_type_label(content_type)
