@@ -386,12 +386,16 @@ def _verify(transcript: str, summary: str) -> str:
     return _llm_call(VERIFY_PROMPT, user_msg)
 
 
-def summarize(video_title: str, transcript: str) -> dict[str, str]:
-    """Agent-based summarization pipeline. Returns {language: summary}."""
+def summarize(video_title: str, transcript: str) -> tuple[dict[str, str], str]:
+    """Agent-based summarization pipeline.
+
+    Returns (summaries_dict, content_type) where summaries_dict is {language: summary}.
+    """
     provider = config.LLM_PROVIDER
 
     # Step 1: Classify
     classification = _classify(video_title, transcript)
+    content_type = classification.get("content_type", "general")
 
     # Step 2: Get the right prompt
     base_prompt = _get_summary_prompt(classification)
@@ -403,22 +407,29 @@ def summarize(video_title: str, transcript: str) -> dict[str, str]:
     )
 
     summaries = {}
+    total_langs = len(config.SUMMARY_LANGUAGES)
 
-    for lang in config.SUMMARY_LANGUAGES:
+    for idx, lang in enumerate(config.SUMMARY_LANGUAGES, 1):
         # Step 3: Summarize
         prompt = _add_language(base_prompt, lang)
         logger.info(
-            "Step 3: Summarizing in %s via %s (%d chars)",
-            lang, provider, len(transcript),
+            "Step 3: Summarizing in %s via %s [%d/%d] (%d chars transcript)...",
+            lang, provider, idx, total_langs, len(transcript),
         )
         summary = _llm_call(prompt, user_message)
         logger.info("Received %s summary (%d chars)", lang, len(summary))
 
+        # Log a brief preview of the summary
+        preview_lines = summary.strip().splitlines()[:3]
+        preview = "\n  ".join(preview_lines)
+        logger.info("Summary preview (%s):\n  %s", lang, preview)
+
         # Step 4: Verify (optional)
         if config.VERIFY_SUMMARY:
+            logger.info("Step 4: Verifying %s summary accuracy...", lang)
             summary = _verify(transcript, summary)
             logger.info("Verified %s summary (%d chars)", lang, len(summary))
 
         summaries[lang] = summary
 
-    return summaries
+    return summaries, content_type

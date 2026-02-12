@@ -95,7 +95,7 @@ VERIFY_SUMMARY=false
 # Email
 SENDER_EMAIL=you@gmail.com
 SENDER_PASSWORD=abcd efgh ijkl mnop
-RECIPIENT_EMAIL=you@gmail.com
+RECIPIENT_EMAILS=you@gmail.com
 ```
 
 ## Usage
@@ -113,6 +113,16 @@ python3 main.py --poll
 ### Test with a specific video
 ```bash
 python3 main.py --video dQw4w9WgXcQ
+```
+
+### Dry run (no email sent — prints summary to stdout)
+```bash
+python3 main.py --video dQw4w9WgXcQ --dry-run
+```
+
+### Validate your configuration
+```bash
+python3 main.py --check
 ```
 
 ## Configuration Reference
@@ -134,7 +144,7 @@ python3 main.py --video dQw4w9WgXcQ
 | `SMTP_PORT` | No | `587` | SMTP port |
 | `SENDER_EMAIL` | Yes | — | Email to send from |
 | `SENDER_PASSWORD` | Yes | — | SMTP password / app password |
-| `RECIPIENT_EMAIL` | Yes | — | Email to send summaries to |
+| `RECIPIENT_EMAILS` | Yes | — | Email(s) to send summaries to (comma-separated) |
 | `POLL_INTERVAL` | No | `3600` | Seconds between checks |
 
 ## Run as a Background Service (Optional)
