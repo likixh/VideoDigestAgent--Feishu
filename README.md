@@ -267,6 +267,59 @@ The digest includes:
 - Per-channel breakdown with condensed summaries
 - Cross-channel analysis (if RAG is enabled)
 
+## Prediction Tracker (Optional)
+
+Track the accuracy of stock/crypto predictions made by YouTube channels over time.
+
+When enabled, the system automatically:
+1. **Extracts** structured predictions from video summaries (tickers, direction, conviction, price targets)
+2. **Fetches** actual market data from yfinance (stocks/ETFs) and CoinGecko (crypto)
+3. **Scores** predictions at 1-week, 1-month, and 3-month windows
+4. **Generates** per-channel scorecards and cross-channel leaderboards
+
+### Enable
+
+```env
+PREDICTION_TRACKING=true
+```
+
+### Prediction Tracker CLI
+
+```bash
+# View a channel's scorecard
+python3 main.py --scorecard MeetKevin
+
+# Cross-channel leaderboard
+python3 main.py --leaderboard
+
+# List tracked predictions
+python3 main.py --predictions
+python3 main.py --predictions MeetKevin
+
+# Manually trigger score update
+python3 main.py --score-update
+
+# Backfill predictions from previously saved summaries
+python3 main.py --backfill
+
+# Tracker stats
+python3 main.py --tracker-stats
+
+# Change evaluation window (default: 1M)
+python3 main.py --scorecard MeetKevin --eval-window 3M
+```
+
+### Scoring Dimensions
+
+| Dimension | Weight | Description |
+|-----------|--------|-------------|
+| Direction accuracy | 50% | Did the stock move the predicted direction? |
+| Target accuracy | 20% | Did it hit the stated price target? |
+| Benchmark performance | 20% | Did the pick beat SPY (stocks) or BTC (crypto)? |
+| Magnitude | 10% | Bonus for large correct moves |
+
+Conviction level (high/medium/low) acts as a multiplier on the composite score.
+
 ## Architecture
 
 ```
@@ -279,6 +332,11 @@ crew_summarizer.py       — CrewAI multi-agent crew (4 specialized agents)
 rag_store.py             — ChromaDB vector store for transcripts + summaries
 cross_analyzer.py        — Cross-video analysis, trends, contradiction detection
 digest.py                — Weekly digest / newsletter generator
+prediction_extractor.py  — LLM-powered extraction of structured predictions
+prediction_db.py         — SQLite database for predictions, scores, and price cache
+market_data.py           — Market data agent (yfinance + CoinGecko)
+prediction_scorer.py     — Scoring engine + report generation
+prediction_tracker.py    — Orchestrator tying extraction → market data → scoring
 emailer.py               — Formats and sends summary email via SMTP
 history.py               — Processing history tracking (JSON persistence)
 config.py                — Loads settings from .env
@@ -311,6 +369,7 @@ config.py                — Loads settings from .env
 | `VERIFY_SUMMARY` | No | `false` | Enable accuracy verification pass |
 | `PIPELINE_ENGINE` | No | `default` | Pipeline: `default`, `langgraph`, or `crewai` |
 | `RAG_ENABLED` | No | `false` | Enable RAG for cross-video context + analytics |
+| `PREDICTION_TRACKING` | No | `false` | Enable prediction tracking and scoring |
 | `SMTP_SERVER` | No | `smtp.gmail.com` | SMTP server |
 | `SMTP_PORT` | No | `587` | SMTP port |
 | `SENDER_EMAIL` | Yes | — | Email to send from |

@@ -129,3 +129,9 @@ if PIPELINE_ENGINE not in _VALID_ENGINES:
 # Enable RAG to give the summarizer context from previous videos.
 # Requires: pip install chromadb
 RAG_ENABLED = os.getenv("RAG_ENABLED", "false").lower() in ("true", "1", "yes")
+
+# ── Prediction Tracking ──────────────────────────────────
+# Extracts stock/crypto predictions from summaries,
+# fetches actual market data, and scores accuracy.
+# Requires: pip install yfinance
+PREDICTION_TRACKING = os.getenv("PREDICTION_TRACKING", "false").lower() in ("true", "1", "yes")

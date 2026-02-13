@@ -21,3 +21,7 @@ typing_extensions>=4.0       # required by langgraph
 
 # CrewAI pipeline engine (for PIPELINE_ENGINE=crewai)
 crewai>=0.80.0               # multi-agent orchestration framework
+
+# ── Optional: Prediction Tracker ──────────────────────
+# Install if you enable PREDICTION_TRACKING=true
+yfinance>=0.2.36             # stock/ETF price data (free, no API key)

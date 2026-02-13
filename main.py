@@ -84,6 +84,7 @@ def _print_banner() -> None:
     verify = "on" if config.VERIFY_SUMMARY else "off"
     engine = config.PIPELINE_ENGINE
     rag = "on" if config.RAG_ENABLED else "off"
+    tracking = "on" if config.PREDICTION_TRACKING else "off"
 
     logger.info("=" * 60)
     logger.info("YouTube Video Summarizer")
@@ -91,6 +92,7 @@ def _print_banner() -> None:
     logger.info("  LLM:        %s (%s)", provider, model_name)
     logger.info("  Engine:     %s", engine)
     logger.info("  RAG:        %s", rag)
+    logger.info("  Tracking:   %s", tracking)
     logger.info("  Channels:   %s", channels)
     logger.info("  Languages:  %s", languages)
     logger.info("  Recipients: %s", recipients)
@@ -212,6 +214,23 @@ def process_video(video: dict, dry_run: bool = False) -> None:
 
     save_summary_to_file(vid_id, title, channel, summaries)
     mark_sent(vid_id, title, channel)
+
+    # Extract and track predictions (if enabled)
+    if config.PREDICTION_TRACKING:
+        try:
+            from prediction_tracker import track_predictions_for_video
+            first_summary = next(iter(summaries.values()), "")
+            track_predictions_for_video(
+                video_id=vid_id,
+                title=title,
+                channel=channel,
+                summary_text=first_summary,
+                content_type=content_type,
+                published_at=published_at,
+            )
+        except Exception as e:
+            logger.warning("Prediction tracking failed (non-fatal): %s", e)
+
     logger.info("Done: %s", title)
     return True
 
@@ -245,6 +264,15 @@ def run_poll(dry_run: bool = False) -> None:
             run_once(dry_run=dry_run)
         except Exception:
             logger.exception("Error during polling cycle")
+
+        # Run prediction score update (if enabled)
+        if config.PREDICTION_TRACKING:
+            try:
+                from prediction_tracker import run_score_update
+                run_score_update()
+            except Exception:
+                logger.exception("Error during prediction score update")
+
         logger.info("Sleeping %d seconds until next check...", config.POLL_INTERVAL)
         time.sleep(config.POLL_INTERVAL)
 
@@ -388,6 +416,66 @@ def run_rag_stats() -> None:
     print()
 
 
+# ── Prediction Tracker Commands ───────────────────────────────────────────
+
+
+def run_scorecard(channel: str, eval_window: str = "1M") -> None:
+    """Print prediction scorecard for a channel."""
+    from prediction_scorer import generate_scorecard
+    print(f"\n{generate_scorecard(channel, eval_window)}\n")
+
+
+def run_leaderboard(eval_window: str = "1M") -> None:
+    """Print cross-channel leaderboard."""
+    from prediction_scorer import generate_leaderboard
+    print(f"\n{generate_leaderboard(eval_window)}\n")
+
+
+def run_predictions(channel: str = None) -> None:
+    """List tracked predictions."""
+    from prediction_db import get_db
+    from prediction_scorer import format_predictions_table
+
+    db = get_db()
+    if channel:
+        predictions = db.get_predictions_for_channel(channel)
+    else:
+        predictions = db.get_open_predictions()
+
+    print(f"\n{format_predictions_table(predictions)}\n")
+
+
+def run_score_update_cmd() -> None:
+    """Manually trigger score update."""
+    from prediction_tracker import run_score_update
+    stats = run_score_update()
+    print(f"\nScore update complete: {stats}\n")
+
+
+def run_backfill() -> None:
+    """Backfill predictions from saved summaries."""
+    from prediction_tracker import run_backfill_from_history
+    stats = run_backfill_from_history()
+    print(f"\nBackfill complete: {stats}\n")
+
+
+def run_tracker_stats() -> None:
+    """Show prediction tracker statistics."""
+    from prediction_db import get_db
+
+    db = get_db()
+    stats = db.get_stats()
+    print(f"\n  Prediction Tracker Statistics:")
+    print(f"  {'─'*40}")
+    print(f"  Total predictions:   {stats['total_predictions']}")
+    print(f"  Open predictions:    {stats['open_predictions']}")
+    print(f"  Scored predictions:  {stats['scored_predictions']}")
+    print(f"  Channels tracked:    {stats['channels_tracked']}")
+    print(f"  Unique tickers:      {stats['unique_tickers']}")
+    print(f"  Price cache entries: {stats['price_cache_entries']}")
+    print()
+
+
 # ── CLI ─────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -460,6 +548,37 @@ RAG Features (set RAG_ENABLED=true):
         help="Show RAG store statistics",
     )
 
+    # Prediction tracker commands
+    parser.add_argument(
+        "--scorecard", type=str, metavar="CHANNEL",
+        help="Show prediction scorecard for a channel",
+    )
+    parser.add_argument(
+        "--leaderboard", action="store_true",
+        help="Show cross-channel prediction leaderboard",
+    )
+    parser.add_argument(
+        "--predictions", type=str, nargs="?", const="__all__", metavar="CHANNEL",
+        help="List tracked predictions (optionally filter by channel)",
+    )
+    parser.add_argument(
+        "--score-update", action="store_true",
+        help="Manually trigger prediction score update",
+    )
+    parser.add_argument(
+        "--backfill", action="store_true",
+        help="Backfill predictions from previously saved summaries",
+    )
+    parser.add_argument(
+        "--tracker-stats", action="store_true",
+        help="Show prediction tracker statistics",
+    )
+    parser.add_argument(
+        "--eval-window", type=str, default="1M",
+        choices=["1W", "1M", "3M"],
+        help="Evaluation window for scorecard/leaderboard (default: 1M)",
+    )
+
     args = parser.parse_args()
 
     if args.check:
@@ -494,6 +613,31 @@ RAG Features (set RAG_ENABLED=true):
 
     if args.rag_stats:
         run_rag_stats()
+        sys.exit(0)
+
+    if args.scorecard:
+        run_scorecard(args.scorecard, args.eval_window)
+        sys.exit(0)
+
+    if args.leaderboard:
+        run_leaderboard(args.eval_window)
+        sys.exit(0)
+
+    if args.predictions:
+        channel = None if args.predictions == "__all__" else args.predictions
+        run_predictions(channel)
+        sys.exit(0)
+
+    if args.score_update:
+        run_score_update_cmd()
+        sys.exit(0)
+
+    if args.backfill:
+        run_backfill()
+        sys.exit(0)
+
+    if args.tracker_stats:
+        run_tracker_stats()
         sys.exit(0)
 
     _print_banner()
