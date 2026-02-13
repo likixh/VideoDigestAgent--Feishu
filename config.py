@@ -108,3 +108,10 @@ POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "3600"))
 PROCESSED_VIDEOS_FILE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "processed_videos.json"
 )
+
+# ── Prediction Tracking ────────────────────────────────
+# When enabled, the system extracts stock/crypto predictions from
+# summaries, fetches actual market data (via yfinance/CoinGecko),
+# and scores prediction accuracy over time.
+# Requires: pip install yfinance
+PREDICTION_TRACKING = os.getenv("PREDICTION_TRACKING", "false").lower() in ("true", "1", "yes")

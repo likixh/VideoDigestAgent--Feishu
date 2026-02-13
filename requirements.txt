@@ -8,3 +8,7 @@ openai-whisper>=20231117
 google-genai>=1.0.0             # for LLM_PROVIDER=gemini (free tier)
 openai>=1.50.0               # for LLM_PROVIDER=openai
 anthropic>=0.42.0            # for LLM_PROVIDER=anthropic
+
+# ── Optional: Prediction Tracker ──────────────────────
+# Install if you enable PREDICTION_TRACKING=true
+yfinance>=0.2.36             # stock/ETF price data (free, no API key)

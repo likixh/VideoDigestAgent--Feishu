@@ -5,12 +5,22 @@ Monitors YouTube channels for new videos, extracts transcripts,
 generates structured summaries using your chosen LLM,
 and emails them to you.
 
+Includes a prediction tracker that extracts stock/crypto calls from
+summaries, fetches actual market data, and scores prediction accuracy.
+
 Usage:
     python main.py              # run once (check for new videos now)
     python main.py --poll       # run continuously, checking every POLL_INTERVAL seconds
     python main.py --video ID   # process a specific video by ID (useful for testing)
     python main.py --dry-run    # run once but skip sending email (print summary instead)
     python main.py --check      # validate config and exit
+
+Prediction Tracker:
+    python main.py --scorecard CHANNEL   # prediction accuracy report for a channel
+    python main.py --leaderboard         # rank all channels by accuracy
+    python main.py --predictions         # list all tracked predictions
+    python main.py --score-update        # fetch prices + score open predictions
+    python main.py --backfill            # extract predictions from saved summaries
 """
 
 import argparse
@@ -48,6 +58,7 @@ def _print_banner() -> None:
     languages = ", ".join(config.SUMMARY_LANGUAGES)
     recipients = ", ".join(config.RECIPIENT_EMAILS)
     verify = "on" if config.VERIFY_SUMMARY else "off"
+    tracking = "on" if config.PREDICTION_TRACKING else "off"
 
     logger.info("=" * 60)
     logger.info("YouTube Video Summarizer")
@@ -57,6 +68,7 @@ def _print_banner() -> None:
     logger.info("  Languages:  %s", languages)
     logger.info("  Recipients: %s", recipients)
     logger.info("  Verify:     %s", verify)
+    logger.info("  Tracking:   %s", tracking)
     logger.info("  Poll:       every %d min", config.POLL_INTERVAL // 60)
     logger.info("=" * 60)
 
@@ -123,6 +135,23 @@ def process_video(video: dict, dry_run: bool = False) -> None:
         mark_failed(vid_id, title, channel, str(e))
         return False
 
+    # Extract and store predictions (if tracking enabled)
+    if config.PREDICTION_TRACKING:
+        try:
+            from prediction_tracker import track_predictions_for_video
+            n_preds = track_predictions_for_video(
+                video_id=vid_id,
+                title=title,
+                channel=channel,
+                content_type=content_type,
+                summaries=summaries,
+                predicted_at=published_at,
+            )
+            if n_preds > 0:
+                logger.info("Tracked %d predictions from %s", n_preds, title)
+        except Exception as e:
+            logger.warning("Prediction tracking failed (non-fatal): %s", e)
+
     try:
         send_summary_email(title, vid_id, summaries, channel, content_type)
     except Exception as e:
@@ -178,6 +207,15 @@ def run_poll(dry_run: bool = False) -> None:
             run_once(dry_run=dry_run)
         except Exception:
             logger.exception("Error during polling cycle")
+
+        # Score predictions during polling (piggyback on the loop)
+        if config.PREDICTION_TRACKING:
+            try:
+                from prediction_tracker import run_score_update
+                run_score_update()
+            except Exception:
+                logger.exception("Error during prediction scoring")
+
         logger.info("Sleeping %d seconds until next check...", config.POLL_INTERVAL)
         time.sleep(config.POLL_INTERVAL)
 
@@ -250,11 +288,92 @@ def run_retry() -> None:
         process_video(video)
 
 
+# ── Prediction Tracker Commands ───────────────────────────────────────────────
+
+def run_scorecard(channel: str, eval_window: str = "1M") -> None:
+    """Print prediction scorecard for a channel."""
+    from prediction_scorer import generate_scorecard
+    report = generate_scorecard(channel, eval_window)
+    print(f"\n{report}\n")
+
+
+def run_leaderboard(eval_window: str = "1M") -> None:
+    """Print cross-channel leaderboard."""
+    from prediction_scorer import generate_leaderboard
+    report = generate_leaderboard(eval_window)
+    print(f"\n{report}\n")
+
+
+def run_predictions(channel: str = None) -> None:
+    """List tracked predictions."""
+    from prediction_db import get_db
+    from prediction_scorer import format_predictions_table
+
+    db = get_db()
+    if channel:
+        predictions = db.get_predictions_for_channel(channel)
+    else:
+        predictions = db.get_all_predictions()
+
+    print(f"\n{format_predictions_table(predictions)}\n")
+
+
+def run_score_update_cmd() -> None:
+    """Run the scoring pipeline."""
+    from prediction_tracker import run_score_update
+    stats = run_score_update()
+    print(f"\nScore update complete:")
+    print(f"  Prices updated:       {stats['prices_updated']}")
+    print(f"  Prices failed:        {stats['prices_failed']}")
+    print(f"  Baselines backfilled: {stats['baselines_backfilled']}")
+    print(f"  Predictions scored:   {stats['scored']}")
+    print(f"  Skipped:              {stats['skipped']}")
+    print(f"  Errors:               {stats['errors']}")
+    print()
+
+
+def run_backfill() -> None:
+    """Backfill predictions from saved summaries."""
+    from prediction_tracker import run_backfill_from_history
+    stats = run_backfill_from_history()
+    print(f"\nBackfill complete:")
+    print(f"  Predictions extracted: {stats['extracted']}")
+    print(f"  Predictions stored:    {stats['stored']}")
+    print()
+
+
+def run_tracker_stats() -> None:
+    """Print prediction tracker statistics."""
+    from prediction_db import get_db
+    db = get_db()
+    stats = db.get_stats()
+    print(f"\n  Prediction Tracker Statistics:")
+    print(f"  {'─'*40}")
+    print(f"  Total predictions:  {stats['total_predictions']}")
+    print(f"  Open predictions:   {stats['open_predictions']}")
+    print(f"  Scored predictions: {stats['scored_predictions']}")
+    print(f"  Cached prices:      {stats['cached_prices']}")
+    print(f"  Channels tracked:   {stats['channels_tracked']}")
+    print(f"  Tickers tracked:    {stats['tickers_tracked']}")
+    print(f"  Database:           {stats['db_path']}")
+    print()
+
+
 # ── CLI ─────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="YouTube Video Summarizer"
+        description="YouTube Video Summarizer + Prediction Tracker",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""\
+Prediction Tracker (set PREDICTION_TRACKING=true):
+  --scorecard CH    Channel prediction accuracy report
+  --leaderboard     Rank channels by prediction accuracy
+  --predictions     List all tracked predictions
+  --score-update    Fetch market prices and score predictions
+  --backfill        Extract predictions from saved summaries
+  --tracker-stats   Show prediction tracker statistics
+""",
     )
     parser.add_argument(
         "--poll", action="store_true",
@@ -282,10 +401,77 @@ def main() -> None:
         action="store_true",
         help="Validate configuration and exit",
     )
+
+    # Prediction tracker commands
+    parser.add_argument(
+        "--scorecard", type=str, metavar="CHANNEL",
+        help="Show prediction accuracy scorecard for a channel",
+    )
+    parser.add_argument(
+        "--leaderboard", action="store_true",
+        help="Show cross-channel prediction accuracy leaderboard",
+    )
+    parser.add_argument(
+        "--predictions", nargs="?", const="__all__", metavar="CHANNEL",
+        help="List tracked predictions (optionally filter by channel)",
+    )
+    parser.add_argument(
+        "--score-update", action="store_true",
+        help="Fetch market prices and score all open predictions",
+    )
+    parser.add_argument(
+        "--backfill", action="store_true",
+        help="Extract predictions from previously saved summaries",
+    )
+    parser.add_argument(
+        "--tracker-stats", action="store_true",
+        help="Show prediction tracker statistics",
+    )
+    parser.add_argument(
+        "--eval-window", type=str, default="1M",
+        choices=["1W", "1M", "3M"],
+        help="Evaluation window for scoring (default: 1M)",
+    )
+
     args = parser.parse_args()
 
     if args.check:
         run_check()
+        sys.exit(0)
+
+    if args.history:
+        run_history()
+        sys.exit(0)
+
+    if args.retry:
+        _print_banner()
+        run_retry()
+        sys.exit(0)
+
+    # Prediction tracker commands
+    if args.scorecard:
+        run_scorecard(args.scorecard, args.eval_window)
+        sys.exit(0)
+
+    if args.leaderboard:
+        run_leaderboard(args.eval_window)
+        sys.exit(0)
+
+    if args.predictions:
+        channel = args.predictions if args.predictions != "__all__" else None
+        run_predictions(channel)
+        sys.exit(0)
+
+    if args.score_update:
+        run_score_update_cmd()
+        sys.exit(0)
+
+    if args.backfill:
+        run_backfill()
+        sys.exit(0)
+
+    if args.tracker_stats:
+        run_tracker_stats()
         sys.exit(0)
 
     _print_banner()
