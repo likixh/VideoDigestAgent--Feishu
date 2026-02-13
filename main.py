@@ -127,6 +127,19 @@ def process_video(video: dict, dry_run: bool = False) -> None:
         send_summary_email(title, vid_id, summaries, channel, content_type)
     except Exception as e:
         logger.error("Email failed for %s: %s", vid_id, e)
+        # Save summaries locally so the API work isn't wasted
+        filepath = save_summary_to_file(vid_id, title, channel, summaries)
+        logger.info("Summary saved to %s despite email failure", filepath)
+        # Print to terminal as fallback
+        video_url = f"https://www.youtube.com/watch?v={vid_id}"
+        print(f"\n{'='*60}")
+        print(f"EMAIL FAILED — printing summary for: {title}")
+        print(f"Channel: @{channel}  |  {video_url}")
+        print(f"{'='*60}")
+        for lang, summary in summaries.items():
+            print(f"\n--- {lang} ---\n")
+            print(summary)
+        print(f"\n{'='*60}\n")
         mark_failed(vid_id, title, channel, f"email: {e}")
         return False
 
