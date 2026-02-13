@@ -5,12 +5,21 @@ Monitors YouTube channels for new videos, extracts transcripts,
 generates structured summaries using your chosen LLM,
 and emails them to you.
 
+Supports three pipeline engines:
+    default   — Sequential pipeline (summarizer.py)
+    langgraph — LangGraph state machine with RAG + quality checks
+    crewai    — CrewAI multi-agent crew (researcher → analyst → writer → fact-checker)
+
 Usage:
     python main.py              # run once (check for new videos now)
     python main.py --poll       # run continuously, checking every POLL_INTERVAL seconds
     python main.py --video ID   # process a specific video by ID (useful for testing)
     python main.py --dry-run    # run once but skip sending email (print summary instead)
     python main.py --check      # validate config and exit
+    python main.py --digest     # generate and email weekly digest
+    python main.py --ask "..."  # ask a question about past videos (RAG-powered)
+    python main.py --compare TOPIC  # cross-channel comparison on a topic
+    python main.py --trends CH  # sentiment trend for a channel
 """
 
 import argparse
@@ -35,6 +44,31 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# ── Pipeline Router ────────────────────────────────────────────────────────────
+
+def _get_summarizer():
+    """Return the summarize function for the configured pipeline engine.
+
+    This is the router — like an API gateway dispatching to the right
+    backend microservice based on config.
+    """
+    engine = config.PIPELINE_ENGINE
+
+    if engine == "langgraph":
+        from langgraph_pipeline import langgraph_summarize
+        logger.info("Using LangGraph pipeline engine")
+        return langgraph_summarize
+
+    elif engine == "crewai":
+        from crew_summarizer import crew_summarize
+        logger.info("Using CrewAI pipeline engine")
+        return crew_summarize
+
+    else:
+        logger.info("Using default pipeline engine")
+        return summarize
+
+
 def _print_banner() -> None:
     """Print a startup banner with configuration summary."""
     provider = config.LLM_PROVIDER
@@ -48,11 +82,15 @@ def _print_banner() -> None:
     languages = ", ".join(config.SUMMARY_LANGUAGES)
     recipients = ", ".join(config.RECIPIENT_EMAILS)
     verify = "on" if config.VERIFY_SUMMARY else "off"
+    engine = config.PIPELINE_ENGINE
+    rag = "on" if config.RAG_ENABLED else "off"
 
     logger.info("=" * 60)
     logger.info("YouTube Video Summarizer")
     logger.info("-" * 60)
     logger.info("  LLM:        %s (%s)", provider, model_name)
+    logger.info("  Engine:     %s", engine)
+    logger.info("  RAG:        %s", rag)
     logger.info("  Channels:   %s", channels)
     logger.info("  Languages:  %s", languages)
     logger.info("  Recipients: %s", recipients)
@@ -116,12 +154,41 @@ def process_video(video: dict, dry_run: bool = False) -> None:
         mark_failed(vid_id, title, channel, str(e))
         return False
 
+    # Route to the configured pipeline engine
+    summarize_fn = _get_summarizer()
+
     try:
-        summaries, content_type = summarize(title, transcript)
+        # LangGraph and CrewAI accept extra kwargs; default summarize() ignores them
+        if config.PIPELINE_ENGINE in ("langgraph", "crewai"):
+            summaries, content_type = summarize_fn(
+                title, transcript,
+                video_id=vid_id,
+                channel=channel,
+                published_at=published_at,
+            )
+        else:
+            summaries, content_type = summarize_fn(title, transcript)
     except Exception as e:
         logger.error("Summarization failed for %s: %s", vid_id, e)
         mark_failed(vid_id, title, channel, str(e))
         return False
+
+    # Index into RAG store (if enabled)
+    if config.RAG_ENABLED:
+        try:
+            from rag_store import get_store
+            store = get_store()
+            store.index_video(
+                video_id=vid_id,
+                title=title,
+                channel=channel,
+                content_type=content_type,
+                transcript=transcript,
+                summaries=summaries,
+                published_at=published_at,
+            )
+        except Exception as e:
+            logger.warning("RAG indexing failed (non-fatal): %s", e)
 
     try:
         send_summary_email(title, vid_id, summaries, channel, content_type)
@@ -250,11 +317,95 @@ def run_retry() -> None:
         process_video(video)
 
 
+def run_digest(days: int = 7, dry_run: bool = False) -> None:
+    """Generate and send weekly digest."""
+    from digest import generate_digest, send_digest_email
+
+    digest_md, metadata = generate_digest(days=days)
+
+    if dry_run or metadata.get("count", 0) == 0:
+        print(digest_md)
+        return
+
+    try:
+        send_digest_email(digest_md, metadata)
+    except Exception as e:
+        logger.error("Digest email failed: %s", e)
+        print(digest_md)
+
+
+def run_ask(question: str) -> None:
+    """Ask a question about past videos (RAG-powered)."""
+    if not config.RAG_ENABLED:
+        print("RAG is disabled. Set RAG_ENABLED=true in your .env file.")
+        print("Then process some videos so they get indexed.")
+        return
+
+    from cross_analyzer import CrossVideoAnalyzer
+    analyzer = CrossVideoAnalyzer()
+    answer = analyzer.ask(question)
+    print(f"\n{answer}\n")
+
+
+def run_compare(topic: str) -> None:
+    """Cross-channel comparison on a topic."""
+    if not config.RAG_ENABLED:
+        print("RAG is disabled. Set RAG_ENABLED=true in your .env file.")
+        return
+
+    from cross_analyzer import CrossVideoAnalyzer
+    analyzer = CrossVideoAnalyzer()
+    report = analyzer.compare_channels_on_topic(topic)
+    print(f"\n{report}\n")
+
+
+def run_trends(channel: str) -> None:
+    """Show sentiment trends for a channel."""
+    if not config.RAG_ENABLED:
+        print("RAG is disabled. Set RAG_ENABLED=true in your .env file.")
+        return
+
+    from cross_analyzer import CrossVideoAnalyzer
+    analyzer = CrossVideoAnalyzer()
+    report = analyzer.get_sentiment_trends(channel)
+    print(f"\n{report}\n")
+
+
+def run_rag_stats() -> None:
+    """Show RAG store statistics."""
+    if not config.RAG_ENABLED:
+        print("RAG is disabled. Set RAG_ENABLED=true in your .env file.")
+        return
+
+    from rag_store import get_store
+    store = get_store()
+    stats = store.get_stats()
+    print(f"\n  RAG Store Statistics:")
+    print(f"  {'─'*40}")
+    print(f"  Transcript chunks: {stats['transcript_chunks']}")
+    print(f"  Summaries:         {stats['summaries']}")
+    print(f"  Storage:           {stats['persist_dir']}")
+    print()
+
+
 # ── CLI ─────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="YouTube Video Summarizer"
+        description="YouTube Video Summarizer",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""\
+Pipeline Engines (set PIPELINE_ENGINE env var):
+  default     Sequential pipeline — classify → summarize → verify
+  langgraph   LangGraph state machine — adds RAG context, quality checks, retry
+  crewai      CrewAI multi-agent — researcher → analyst → writer → fact-checker
+
+RAG Features (set RAG_ENABLED=true):
+  --ask       Ask questions about past videos
+  --compare   Compare what channels say about a topic
+  --trends    Track a channel's sentiment over time
+  --rag-stats Show RAG index statistics
+""",
     )
     parser.add_argument(
         "--poll", action="store_true",
@@ -282,10 +433,67 @@ def main() -> None:
         action="store_true",
         help="Validate configuration and exit",
     )
+
+    # New commands
+    parser.add_argument(
+        "--digest", action="store_true",
+        help="Generate and email weekly digest of all recent summaries",
+    )
+    parser.add_argument(
+        "--days", type=int, default=7,
+        help="Number of days to include in digest (default: 7)",
+    )
+    parser.add_argument(
+        "--ask", type=str,
+        help="Ask a question about past videos (requires RAG_ENABLED=true)",
+    )
+    parser.add_argument(
+        "--compare", type=str,
+        help="Cross-channel comparison on a topic (requires RAG_ENABLED=true)",
+    )
+    parser.add_argument(
+        "--trends", type=str,
+        help="Show sentiment trends for a channel (requires RAG_ENABLED=true)",
+    )
+    parser.add_argument(
+        "--rag-stats", action="store_true",
+        help="Show RAG store statistics",
+    )
+
     args = parser.parse_args()
 
     if args.check:
         run_check()
+        sys.exit(0)
+
+    if args.history:
+        run_history()
+        sys.exit(0)
+
+    if args.retry:
+        _print_banner()
+        run_retry()
+        sys.exit(0)
+
+    if args.digest:
+        _print_banner()
+        run_digest(days=args.days, dry_run=args.dry_run)
+        sys.exit(0)
+
+    if args.ask:
+        run_ask(args.ask)
+        sys.exit(0)
+
+    if args.compare:
+        run_compare(args.compare)
+        sys.exit(0)
+
+    if args.trends:
+        run_trends(args.trends)
+        sys.exit(0)
+
+    if args.rag_stats:
+        run_rag_stats()
         sys.exit(0)
 
     _print_banner()

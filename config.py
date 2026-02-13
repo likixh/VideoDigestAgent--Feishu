@@ -108,3 +108,24 @@ POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "3600"))
 PROCESSED_VIDEOS_FILE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "processed_videos.json"
 )
+
+# ── Pipeline Engine ─────────────────────────────────────
+# Choose which summarization pipeline to use:
+#   "default"   — Original sequential pipeline (summarizer.py)
+#   "langgraph" — LangGraph state machine with RAG, quality checks, retry logic
+#   "crewai"    — CrewAI multi-agent crew (researcher → analyst → writer → fact-checker)
+PIPELINE_ENGINE = os.getenv("PIPELINE_ENGINE", "default").lower()
+
+_VALID_ENGINES = ("default", "langgraph", "crewai")
+if PIPELINE_ENGINE not in _VALID_ENGINES:
+    print(
+        f"Error: Unknown PIPELINE_ENGINE '{PIPELINE_ENGINE}'. "
+        f"Choose from: {', '.join(_VALID_ENGINES)}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+# ── RAG (Retrieval-Augmented Generation) ────────────────
+# Enable RAG to give the summarizer context from previous videos.
+# Requires: pip install chromadb
+RAG_ENABLED = os.getenv("RAG_ENABLED", "false").lower() in ("true", "1", "yes")

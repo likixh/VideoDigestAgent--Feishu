@@ -8,3 +8,16 @@ openai-whisper>=20231117
 google-genai>=1.0.0             # for LLM_PROVIDER=gemini (free tier)
 openai>=1.50.0               # for LLM_PROVIDER=openai
 anthropic>=0.42.0            # for LLM_PROVIDER=anthropic
+
+# ── Optional: Agentic Framework Dependencies ──────────
+# Install only the ones you plan to use:
+
+# RAG pipeline (for PIPELINE_ENGINE=langgraph or RAG_ENABLED=true)
+chromadb>=0.5.0              # local vector database (like local Elasticsearch)
+
+# LangGraph pipeline engine (for PIPELINE_ENGINE=langgraph)
+langgraph>=0.2.0             # state machine workflow engine
+typing_extensions>=4.0       # required by langgraph
+
+# CrewAI pipeline engine (for PIPELINE_ENGINE=crewai)
+crewai>=0.80.0               # multi-agent orchestration framework

@@ -6,3 +6,4 @@ venv/
 .venv/
 audio_tmp/
 summaries/
+chroma_db/

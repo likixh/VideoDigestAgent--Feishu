@@ -186,16 +186,137 @@ sudo systemctl enable yt-summarizer
 sudo systemctl start yt-summarizer
 ```
 
+## Agentic Framework Integration
+
+The project supports three pipeline engines — choose the one that fits your needs:
+
+### Default Pipeline (`PIPELINE_ENGINE=default`)
+The original sequential pipeline. Simple, reliable, low cost.
+
+```
+classify → select prompt → summarize → verify (optional)
+```
+
+### LangGraph Pipeline (`PIPELINE_ENGINE=langgraph`)
+A proper state machine workflow (like Airflow/Temporal for LLM flows):
+
+```
+classify → RAG context retrieval → select prompt → summarize
+    → quality check → (retry if low quality) → verify → done
+```
+
+**What it adds over default:**
+- **RAG context injection**: Automatically fetches relevant past video summaries to enrich new summaries ("Last week you said X about NVDA, now...")
+- **Quality gate**: Scores summaries on length, structure, and TL;DR presence — retries up to 2x if quality is low
+- **Conditional routing**: Different paths based on content type and quality score
+
+Install: `pip install langgraph chromadb`
+
+### CrewAI Pipeline (`PIPELINE_ENGINE=crewai`)
+Multi-agent orchestration (like microservices architecture for AI):
+
+```
+Researcher → Analyst → Writer → Fact-Checker
+```
+
+Each agent has a specialized role:
+| Agent | Role | Analog |
+|-------|------|--------|
+| **Researcher** | Queries RAG for historical context | Data service |
+| **Analyst** | Deep content analysis by content type | Domain service |
+| **Writer** | Crafts structured markdown summary | Presentation service |
+| **Fact-Checker** | Verifies accuracy against transcript | QA service |
+
+Install: `pip install crewai chromadb`
+
+### RAG-Powered Features (`RAG_ENABLED=true`)
+
+When RAG is enabled, every processed video gets indexed into a local ChromaDB vector store. This powers several analytical features:
+
+```bash
+# Ask any question about past videos
+python3 main.py --ask "What did RhinoFinance say about NVDA last week?"
+
+# Compare what channels say about the same topic
+python3 main.py --compare "interest rates"
+
+# Track a channel's sentiment over time
+python3 main.py --trends RhinoFinance
+
+# View RAG index stats
+python3 main.py --rag-stats
+```
+
+### Weekly Digest
+
+Aggregate all summaries from a time period into a single executive briefing email:
+
+```bash
+# Weekly digest (default: last 7 days)
+python3 main.py --digest
+
+# Last 3 days
+python3 main.py --digest --days 3
+
+# Preview without emailing
+python3 main.py --digest --dry-run
+```
+
+The digest includes:
+- Executive overview (LLM-generated synthesis of all recent content)
+- Per-channel breakdown with condensed summaries
+- Cross-channel analysis (if RAG is enabled)
+
 ## Architecture
 
 ```
-main.py                  — Orchestrator: CLI + polling loop
+main.py                  — Orchestrator: CLI + pipeline router + polling loop
 youtube_monitor.py       — Detects new uploads via YouTube Data API (multi-channel)
 transcript_extractor.py  — Extracts captions (YouTube API → Whisper fallback)
-summarizer.py            — Agent pipeline: classify → prompt → summarize → verify
+summarizer.py            — Default pipeline: classify → prompt → summarize → verify
+langgraph_pipeline.py    — LangGraph state machine with RAG + quality checks
+crew_summarizer.py       — CrewAI multi-agent crew (4 specialized agents)
+rag_store.py             — ChromaDB vector store for transcripts + summaries
+cross_analyzer.py        — Cross-video analysis, trends, contradiction detection
+digest.py                — Weekly digest / newsletter generator
 emailer.py               — Formats and sends summary email via SMTP
+history.py               — Processing history tracking (JSON persistence)
 config.py                — Loads settings from .env
 ```
+
+### Concepts for Software Engineers
+
+| AI Concept | Traditional Analog | Implementation |
+|---|---|---|
+| **Prompt Engineering** | Writing API docs / interface contracts | `summarizer.py` prompt templates |
+| **RAG Pipeline** | Elasticsearch (embed + index + search) | `rag_store.py` with ChromaDB |
+| **Agent Framework** | Workflow engine (Airflow, Temporal) | `langgraph_pipeline.py` |
+| **Multi-Agent** | Microservice orchestration (K8s, saga pattern) | `crew_summarizer.py` with CrewAI |
+| **MCP Protocol** | gRPC / API gateway | Pipeline router in `main.py` |
+
+## Configuration Reference
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `YOUTUBE_CHANNELS` | Yes | — | Comma-separated channel handles (without @) |
+| `YOUTUBE_API_KEY` | Yes | — | YouTube Data API v3 key |
+| `LLM_PROVIDER` | No | `gemini` | LLM to use: `gemini`, `openai`, or `anthropic` |
+| `GEMINI_API_KEY` | If gemini | — | Google Gemini API key |
+| `GEMINI_MODEL` | No | `gemini-2.0-flash` | Gemini model to use |
+| `OPENAI_API_KEY` | If openai | — | OpenAI API key |
+| `OPENAI_MODEL` | No | `gpt-4o-mini` | OpenAI model to use |
+| `ANTHROPIC_API_KEY` | If anthropic | — | Anthropic API key |
+| `ANTHROPIC_MODEL` | No | `claude-sonnet-4-5-20250929` | Claude model to use |
+| `SUMMARY_LANGUAGES` | No | `English` | Up to 2 languages, comma-separated |
+| `VERIFY_SUMMARY` | No | `false` | Enable accuracy verification pass |
+| `PIPELINE_ENGINE` | No | `default` | Pipeline: `default`, `langgraph`, or `crewai` |
+| `RAG_ENABLED` | No | `false` | Enable RAG for cross-video context + analytics |
+| `SMTP_SERVER` | No | `smtp.gmail.com` | SMTP server |
+| `SMTP_PORT` | No | `587` | SMTP port |
+| `SENDER_EMAIL` | Yes | — | Email to send from |
+| `SENDER_PASSWORD` | Yes | — | SMTP password / app password |
+| `RECIPIENT_EMAILS` | Yes | — | Email(s) to send summaries to (comma-separated) |
+| `POLL_INTERVAL` | No | `3600` | Seconds between checks |
 
 ## Cost Estimate
 
@@ -206,6 +327,8 @@ Each video goes through 2-3 LLM calls (classify + summarize, optionally + verify
 | Without verification | Free | ~$0.02/video | ~$0.02/video |
 | With verification | Free | ~$0.04/video | ~$0.04/video |
 | Per extra language | Free | ~$0.02/video | ~$0.02/video |
+| CrewAI pipeline | Free | ~$0.08/video | ~$0.08/video |
 
 - **YouTube Data API**: Free tier (10,000 units/day, each poll ~4 units/channel)
 - **Email**: Free via Gmail SMTP
+- **ChromaDB (RAG)**: Free (local, no external service)
