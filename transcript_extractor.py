@@ -10,6 +10,10 @@ import os
 import shutil
 import tempfile
 
+# Prevent OMP Error #15 on Windows when both PyTorch (Whisper) and NumPy
+# link against separate copies of the Intel OpenMP runtime (libiomp5md.dll).
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
 from youtube_transcript_api import YouTubeTranscriptApi
 
 logger = logging.getLogger(__name__)

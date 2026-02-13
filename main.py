@@ -32,6 +32,9 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+# Suppress benign "file_cache is only supported with oauth2client<4.0.0" warning.
+# This project uses API-key auth, so the file cache is irrelevant.
+logging.getLogger("googleapiclient.discovery_cache").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
 
