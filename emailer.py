@@ -2,7 +2,6 @@
 
 import logging
 import smtplib
-from email import policy as email_policy
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -92,7 +91,10 @@ def _content_type_label(content_type: str) -> str:
 
 def _sanitize(text: str) -> str:
     """Replace non-breaking spaces and other problematic whitespace with regular spaces."""
-    return text.replace("\xa0", " ")
+    import re
+    # Replace all Unicode whitespace characters (NBSP, em-space, en-space, etc.)
+    # with a regular ASCII space, except newlines/tabs which are intentional.
+    return re.sub(r"[\xa0\u2000-\u200b\u2028\u2029\u202f\u205f\u3000\ufeff]", " ", text)
 
 
 def send_summary_email(
@@ -196,10 +198,6 @@ def send_summary_email(
     with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT) as server:
         server.starttls()
         server.login(config.SENDER_EMAIL, config.SENDER_PASSWORD)
-        server.sendmail(
-            config.SENDER_EMAIL,
-            recipients,
-            msg.as_bytes(policy=email_policy.SMTP),
-        )
+        server.send_message(msg, config.SENDER_EMAIL, recipients)
 
     logger.info("Email sent successfully")
