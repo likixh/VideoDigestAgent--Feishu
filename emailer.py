@@ -2,9 +2,7 @@
 
 import logging
 import smtplib
-from email.header import Header
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+from email.message import EmailMessage
 
 import config
 
@@ -124,8 +122,8 @@ def send_summary_email(
         except (ValueError, TypeError):
             date_display = published_at
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = Header(f"[@{channel}] New Video Summary: {video_title}", "utf-8")
+    msg = EmailMessage()
+    msg["Subject"] = f"[@{channel}] New Video Summary: {video_title}"
     msg["From"] = config.SENDER_EMAIL
     msg["To"] = ", ".join(recipients)
 
@@ -190,14 +188,14 @@ def send_summary_email(
 </body>
 </html>"""
 
-    msg.attach(MIMEText(text_body, "plain", "utf-8"))
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
+    msg.set_content(text_body, charset="utf-8")
+    msg.add_alternative(html_body, subtype="html", charset="utf-8")
 
     logger.info("Sending email to %s", ", ".join(recipients))
 
     with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT) as server:
         server.starttls()
         server.login(config.SENDER_EMAIL, config.SENDER_PASSWORD)
-        server.send_message(msg, config.SENDER_EMAIL, recipients)
+        server.send_message(msg)
 
     logger.info("Email sent successfully")
