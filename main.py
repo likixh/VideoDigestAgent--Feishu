@@ -46,7 +46,7 @@ def _print_banner() -> None:
 
     channels = ", ".join(f"@{ch}" for ch in config.YOUTUBE_CHANNELS)
     languages = ", ".join(config.SUMMARY_LANGUAGES)
-    recipients = ", ".join(config.RECIPIENT_EMAILS)
+    recipients = ", ".join(config.RECIPIENT_EMAILS) if config.RECIPIENT_EMAILS else "—"
     verify = "on" if config.VERIFY_SUMMARY else "off"
 
     logger.info("=" * 60)
@@ -55,7 +55,9 @@ def _print_banner() -> None:
     logger.info("  LLM:        %s (%s)", provider, model_name)
     logger.info("  Channels:   %s", channels)
     logger.info("  Languages:  %s", languages)
-    logger.info("  Recipients: %s", recipients)
+    logger.info("  Output:     %s", config.OUTPUT_MODE)
+    if config.OUTPUT_MODE in ("email", "both"):
+        logger.info("  Recipients: %s", recipients)
     logger.info("  Verify:     %s", verify)
     logger.info("  Poll:       every %d min", config.POLL_INTERVAL // 60)
     logger.info("=" * 60)
@@ -123,13 +125,19 @@ def process_video(video: dict, dry_run: bool = False) -> None:
         mark_failed(vid_id, title, channel, str(e))
         return False
 
-    try:
-        send_summary_email(title, vid_id, summaries, channel, content_type)
-    except Exception as e:
-        logger.error("Email failed for %s: %s", vid_id, e)
-        # Save summaries locally so the API work isn't wasted
-        filepath = save_summary_to_file(vid_id, title, channel, summaries)
-        logger.info("Summary saved to %s despite email failure", filepath)
+    # ── Deliver output based on OUTPUT_MODE ────────────────────────
+    email_err = None
+    if config.OUTPUT_MODE in ("email", "both") and not dry_run:
+        try:
+            send_summary_email(title, vid_id, summaries, channel, content_type)
+        except Exception as e:
+            logger.error("Email failed for %s: %s", vid_id, e)
+            email_err = e
+
+    if config.OUTPUT_MODE in ("local", "both") or email_err is not None:
+        save_summary_to_file(vid_id, title, channel, summaries)
+
+    if email_err is not None:
         # Print to terminal as fallback
         video_url = f"https://www.youtube.com/watch?v={vid_id}"
         print(f"\n{'='*60}")
@@ -140,10 +148,9 @@ def process_video(video: dict, dry_run: bool = False) -> None:
             print(f"\n--- {lang} ---\n")
             print(summary)
         print(f"\n{'='*60}\n")
-        mark_failed(vid_id, title, channel, f"email: {e}")
+        mark_failed(vid_id, title, channel, f"email: {email_err}")
         return False
 
-    save_summary_to_file(vid_id, title, channel, summaries)
     mark_sent(vid_id, title, channel)
     logger.info("Done: %s", title)
     return True
