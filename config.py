@@ -89,7 +89,11 @@ VERIFY_SUMMARY = os.getenv("VERIFY_SUMMARY", "false").lower() in ("true", "1", "
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SENDER_EMAIL = _require("SENDER_EMAIL")
-SENDER_PASSWORD = _require("SENDER_PASSWORD")
+# Replace non-breaking spaces (\xa0) with regular spaces in the password.
+# Copy-pasting Google App Passwords from the web often introduces \xa0
+# between the 4-character groups, which causes smtplib's AUTH PLAIN to fail
+# with: UnicodeEncodeError: 'ascii' codec can't encode character '\xa0'
+SENDER_PASSWORD = _require("SENDER_PASSWORD").replace("\xa0", " ")
 
 # Support multiple recipients (comma-separated), with backwards compatibility
 _raw_recipients = os.getenv("RECIPIENT_EMAILS", "") or os.getenv("RECIPIENT_EMAIL", "")

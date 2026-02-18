@@ -2,9 +2,8 @@
 
 import logging
 import smtplib
-from email.header import Header
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+from email.message import EmailMessage
+from email.policy import SMTP as SMTP_POLICY
 
 import config
 
@@ -124,16 +123,12 @@ def send_summary_email(
         except (ValueError, TypeError):
             date_display = published_at
 
-    # Use MIMEMultipart (legacy/compat32 API) instead of EmailMessage to avoid
-    # UnicodeEncodeError bugs in EmailPolicy header folding with non-ASCII
-    # characters (CPython issues #143712, #77749, #85195).
-    msg = MIMEMultipart("alternative")
-    subject = f"[@{channel}] New Video Summary: {video_title}"
-    msg["Subject"] = Header(subject, "utf-8")
+    msg = EmailMessage(policy=SMTP_POLICY)
+    msg["Subject"] = f"[@{channel}] New Video Summary: {video_title}"
     msg["From"] = config.SENDER_EMAIL
     msg["To"] = ", ".join(recipients)
 
-    # Build plain text
+    # Build plain text body
     text_parts = [
         f"New video from @{channel}\n"
         f"Title: {video_title}\n"
@@ -146,7 +141,7 @@ def send_summary_email(
         text_parts.append(f"\n{'='*60}\n{lang}\n{'='*60}\n\n{summary}")
     text_body = "\n".join(text_parts)
 
-    # Build HTML
+    # Build HTML body
     summary_html_parts = []
     for lang, summary in summaries.items():
         summary_html_parts.append(
@@ -194,9 +189,11 @@ def send_summary_email(
 </body>
 </html>"""
 
-    # Attach plain text and HTML parts with explicit UTF-8 charset
-    msg.attach(MIMEText(text_body, "plain", "utf-8"))
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
+    # Set the plain text body, then add the HTML alternative.
+    # EmailMessage.set_content() handles charset detection and
+    # Content-Transfer-Encoding (quoted-printable for text) automatically.
+    msg.set_content(text_body, subtype="plain")
+    msg.add_alternative(html_body, subtype="html")
 
     logger.info("Sending email to %s", ", ".join(recipients))
 
