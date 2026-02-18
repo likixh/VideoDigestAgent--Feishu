@@ -39,11 +39,11 @@ def _get_new_videos_for_channel(youtube, handle: str, processed: set[str]) -> li
     ).execute()
     uploads_playlist = ch_resp["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
 
-    # Fetch the most recent upload only
+    # Fetch a few recent uploads so we catch videos uploaded between checks
     pl_resp = youtube.playlistItems().list(
         part="snippet",
         playlistId=uploads_playlist,
-        maxResults=1,
+        maxResults=5,
     ).execute()
 
     new_videos = []

@@ -35,9 +35,22 @@ def _save_history(history: dict[str, dict]) -> None:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
 
+MAX_RETRIES = 3
+
+
 def get_processed_ids() -> set[str]:
-    """Return set of all video IDs that have been processed (any status)."""
-    return set(_load_history().keys())
+    """Return video IDs that should be skipped when checking for new videos.
+
+    Includes sent and init (seen) videos.  Failed videos are excluded so they
+    get automatically retried, unless they have already failed MAX_RETRIES times.
+    """
+    history = _load_history()
+    return {
+        vid_id
+        for vid_id, meta in history.items()
+        if meta.get("status") != "failed"
+        or meta.get("retry_count", 1) >= MAX_RETRIES
+    }
 
 
 def mark_sent(video_id: str, title: str, channel: str) -> None:
@@ -53,14 +66,19 @@ def mark_sent(video_id: str, title: str, channel: str) -> None:
 
 def mark_failed(video_id: str, title: str, channel: str, error: str) -> None:
     history = _load_history()
+    prev = history.get(video_id, {})
+    retry_count = prev.get("retry_count", 0) + 1
     history[video_id] = {
         "status": "failed",
         "title": title,
         "channel": channel,
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         "error": error,
+        "retry_count": retry_count,
     }
     _save_history(history)
+    if retry_count >= MAX_RETRIES:
+        logger.warning("Video %s has failed %d times — will not auto-retry", video_id, retry_count)
 
 
 def mark_seen(video_id: str) -> None:
