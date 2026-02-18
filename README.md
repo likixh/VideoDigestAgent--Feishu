@@ -1,6 +1,6 @@
 # YouTube Video Summarizer
 
-Automatically monitors YouTube channels for new videos, extracts transcripts, **auto-detects the content type** (stocks, crypto, podcast, tech review, education, news, etc.), generates tailored summaries using your choice of LLM (Gemini, OpenAI, or Claude), and emails them to you.
+Automatically monitors YouTube channels for new videos, extracts transcripts, **auto-detects the content type** (stocks, crypto, podcast, tech review, education, news, etc.), generates tailored summaries using your choice of LLM (Gemini, OpenAI, or Claude), and delivers them via email, local file, or both.
 
 ## How It Works
 
@@ -48,7 +48,7 @@ The app uses an **agent-based pipeline** to produce accurate, content-aware summ
 | **OpenAI** | ~$0.02-0.10/video | Go to [OpenAI Platform](https://platform.openai.com/api-keys) → Create new secret key |
 | **Anthropic (Claude)** | ~$0.02-0.06/video | Go to [Anthropic Console](https://console.anthropic.com/) → API Keys → Create Key |
 
-#### Gmail App Password (for sending emails)
+#### Gmail App Password (only needed if `OUTPUT_MODE` is `email` or `both`)
 1. Go to [Google Account Security](https://myaccount.google.com/security)
 2. Enable **2-Step Verification** if not already on
 3. Go to [App Passwords](https://myaccount.google.com/apppasswords)
@@ -56,6 +56,8 @@ The app uses an **agent-based pipeline** to produce accurate, content-aware summ
 5. Copy the 16-character password — this is your `SENDER_PASSWORD`
 
 > **Note:** If you don't use Gmail, update `SMTP_SERVER` and `SMTP_PORT` for your provider (e.g., Outlook: `smtp.office365.com:587`).
+>
+> **Tip:** If you just want to save summaries locally without email, set `OUTPUT_MODE=local` and skip this step entirely.
 
 ### 2. Install Dependencies
 
@@ -92,7 +94,10 @@ SUMMARY_LANGUAGES=English,Chinese
 # Verify accuracy with a second LLM pass (optional)
 VERIFY_SUMMARY=false
 
-# Email
+# Output: email, local, or both
+OUTPUT_MODE=email
+
+# Email (only needed when OUTPUT_MODE is email or both)
 SENDER_EMAIL=you@gmail.com
 SENDER_PASSWORD=abcd efgh ijkl mnop
 RECIPIENT_EMAILS=you@gmail.com
@@ -140,11 +145,12 @@ python3 main.py --check
 | `ANTHROPIC_MODEL` | No | `claude-sonnet-4-5-20250929` | Claude model to use |
 | `SUMMARY_LANGUAGES` | No | `English` | Up to 2 languages, comma-separated |
 | `VERIFY_SUMMARY` | No | `false` | Enable accuracy verification pass |
+| `OUTPUT_MODE` | No | `email` | `email`, `local` (save file only), or `both` |
 | `SMTP_SERVER` | No | `smtp.gmail.com` | SMTP server |
 | `SMTP_PORT` | No | `587` | SMTP port |
-| `SENDER_EMAIL` | Yes | — | Email to send from |
-| `SENDER_PASSWORD` | Yes | — | SMTP password / app password |
-| `RECIPIENT_EMAILS` | Yes | — | Email(s) to send summaries to (comma-separated) |
+| `SENDER_EMAIL` | If email/both | — | Email to send from |
+| `SENDER_PASSWORD` | If email/both | — | SMTP password / app password |
+| `RECIPIENT_EMAILS` | If email/both | — | Email(s) to send summaries to (comma-separated) |
 | `POLL_INTERVAL` | No | `3600` | Seconds between checks |
 
 ## Run as a Background Service (Optional)
@@ -194,7 +200,8 @@ youtube_monitor.py       — Detects new uploads via YouTube Data API (multi-cha
 transcript_extractor.py  — Extracts captions (YouTube API → Whisper fallback)
 summarizer.py            — Agent pipeline: classify → prompt → summarize → verify
 emailer.py               — Formats and sends summary email via SMTP
-config.py                — Loads settings from .env
+history.py               — Tracks processed videos + saves summaries locally
+config.py                — Loads settings from .env (incl. OUTPUT_MODE)
 ```
 
 ## Cost Estimate
@@ -208,4 +215,4 @@ Each video goes through 2-3 LLM calls (classify + summarize, optionally + verify
 | Per extra language | Free | ~$0.02/video | ~$0.02/video |
 
 - **YouTube Data API**: Free tier (10,000 units/day, each poll ~4 units/channel)
-- **Email**: Free via Gmail SMTP
+- **Email**: Free via Gmail SMTP (or skip email entirely with `OUTPUT_MODE=local`)
