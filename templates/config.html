@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Configuration{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="page-title mb-0">Configuration</h1>
+</div>
+
+<form method="POST" action="{{ url_for('config_save') }}" id="configForm">
+    {% for section in sections %}
+    <div class="config-section" id="section-{{ section.id }}">
+        <div class="config-section-title">
+            <i class="bi {{ section.icon }}"></i> {{ section.title }}
+        </div>
+        <div class="row g-3">
+            {% for field in section.fields %}
+            <div class="col-md-{% if field.type == 'checkbox' %}12{% elif field.key in ['GEMINI_FALLBACK_MODELS', 'RECIPIENT_EMAILS', 'YOUTUBE_CHANNELS'] %}12{% else %}6{% endif %}"
+                 {% if field.show_if %}data-show-if="{{ field.show_if }}" class="provider-field"{% endif %}>
+
+                {% if field.type == 'checkbox' %}
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="{{ field.key }}"
+                           name="{{ field.key }}"
+                           {% if values.get(field.key, field.get('default', 'false')) in ['true', '1', 'yes'] %}checked{% endif %}>
+                    <label class="form-check-label" for="{{ field.key }}">
+                        {{ field.label }}
+                        {% if field.help %}
+                        <small class="text-muted d-block">{{ field.help }}</small>
+                        {% endif %}
+                    </label>
+                </div>
+
+                {% elif field.type == 'select' %}
+                <label class="form-label" for="{{ field.key }}">{{ field.label }}</label>
+                <select class="form-select" id="{{ field.key }}" name="{{ field.key }}">
+                    {% for opt in field.options %}
+                    <option value="{{ opt }}"
+                            {% if values.get(field.key, field.get('default', '')) == opt %}selected{% endif %}>
+                        {{ opt }}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                {% elif field.type == 'password' %}
+                <label class="form-label" for="{{ field.key }}">
+                    {{ field.label }}
+                    {% if field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="{{ field.key }}"
+                           name="{{ field.key }}"
+                           placeholder="{% if values.get(field.key) %}(saved — leave blank to keep){% else %}{{ field.placeholder or '' }}{% endif %}"
+                           autocomplete="off">
+                    <button class="btn btn-outline-secondary" type="button"
+                            onclick="togglePassword('{{ field.key }}')">
+                        <i class="bi bi-eye" id="eye-{{ field.key }}"></i>
+                    </button>
+                </div>
+                {% if field.help %}
+                <small class="text-muted">{{ field.help }}</small>
+                {% endif %}
+
+                {% else %}
+                <label class="form-label" for="{{ field.key }}">
+                    {{ field.label }}
+                    {% if field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                <input type="{{ field.type }}" class="form-control" id="{{ field.key }}"
+                       name="{{ field.key }}"
+                       value="{{ values.get(field.key, field.get('default', '')) }}"
+                       placeholder="{{ field.placeholder or '' }}">
+                {% if field.help %}
+                <small class="text-muted">{{ field.help }}</small>
+                {% endif %}
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <div class="d-flex gap-2 mb-4">
+        <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check-lg"></i> Save Configuration
+        </button>
+        <button type="reset" class="btn btn-outline-secondary">Reset</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Toggle password visibility
+function togglePassword(fieldId) {
+    const input = document.getElementById(fieldId);
+    const eye = document.getElementById('eye-' + fieldId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        eye.className = 'bi bi-eye-slash';
+    } else {
+        input.type = 'password';
+        eye.className = 'bi bi-eye';
+    }
+}
+
+// Show/hide provider-specific fields
+function updateProviderFields() {
+    const provider = document.getElementById('LLM_PROVIDER').value;
+    document.querySelectorAll('.provider-field').forEach(el => {
+        const showIf = el.dataset.showIf;
+        if (showIf) {
+            el.style.display = (showIf === provider) ? '' : 'none';
+            // Disable hidden inputs so they don't get submitted
+            el.querySelectorAll('input, select').forEach(inp => {
+                inp.disabled = (showIf !== provider);
+            });
+        }
+    });
+}
+
+document.getElementById('LLM_PROVIDER').addEventListener('change', updateProviderFields);
+updateProviderFields();
+</script>
+{% endblock %}
