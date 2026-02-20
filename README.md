@@ -87,6 +87,8 @@ YOUTUBE_API_KEY=AIza...
 # Pick your LLM: gemini, openai, or anthropic
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=AIza...
+# Fallback models if primary hits quota (optional)
+# GEMINI_FALLBACK_MODELS=gemini-2.5-flash,gemini-2.5-flash-lite,gemini-2.5-pro
 
 # Summary languages (up to 2)
 SUMMARY_LANGUAGES=English,Chinese
@@ -138,7 +140,8 @@ python3 main.py --check
 | `YOUTUBE_API_KEY` | Yes | — | YouTube Data API v3 key |
 | `LLM_PROVIDER` | No | `gemini` | LLM to use: `gemini`, `openai`, or `anthropic` |
 | `GEMINI_API_KEY` | If gemini | — | Google Gemini API key |
-| `GEMINI_MODEL` | No | `gemini-2.0-flash` | Gemini model to use |
+| `GEMINI_MODEL` | No | `gemini-3.1-pro-preview` | Gemini model to use |
+| `GEMINI_FALLBACK_MODELS` | No | `gemini-2.5-flash,gemini-2.5-flash-lite,gemini-2.5-pro` | Fallback models when primary hits quota (comma-separated, in order) |
 | `OPENAI_API_KEY` | If openai | — | OpenAI API key |
 | `OPENAI_MODEL` | No | `gpt-4o-mini` | OpenAI model to use |
 | `ANTHROPIC_API_KEY` | If anthropic | — | Anthropic API key |
