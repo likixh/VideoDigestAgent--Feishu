@@ -60,7 +60,7 @@ try:
         # Set to empty string to disable fallback.
         _raw_fallbacks = os.getenv(
             "GEMINI_FALLBACK_MODELS",
-            "gemini-2.5-flash,gemini-2.5-flash-lite,gemini-2.5-pro",
+            "gemini-3-pro-preview,gemini-3-flash-preview,gemini-2.5-pro,gemini-2.5-flash,gemini-2.5-flash-lite",
         )
         GEMINI_FALLBACK_MODELS: list[str] = [
             m.strip() for m in _raw_fallbacks.split(",") if m.strip()
