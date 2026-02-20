@@ -55,7 +55,16 @@ if LLM_PROVIDER not in _VALID_PROVIDERS:
 try:
     if LLM_PROVIDER == "gemini":
         GEMINI_API_KEY = _require_for_provider("GEMINI_API_KEY", "gemini")
-        GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-pro-preview")
+        # Ordered fallback chain when the primary model hits quota / rate-limit.
+        # Set to empty string to disable fallback.
+        _raw_fallbacks = os.getenv(
+            "GEMINI_FALLBACK_MODELS",
+            "gemini-2.5-flash,gemini-2.5-flash-lite,gemini-2.5-pro",
+        )
+        GEMINI_FALLBACK_MODELS: list[str] = [
+            m.strip() for m in _raw_fallbacks.split(",") if m.strip()
+        ]
     elif LLM_PROVIDER == "openai":
         OPENAI_API_KEY = _require_for_provider("OPENAI_API_KEY", "openai")
         OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")

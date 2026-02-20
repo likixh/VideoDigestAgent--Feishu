@@ -267,23 +267,64 @@ at the top: "✓ Verified — no corrections needed."
 # ── LLM call wrappers ───────────────────────────────────────────────────────
 
 
+def _gemini_generate(client, model: str, system_prompt: str, user_message: str) -> str:
+    """Call a single Gemini model. Raises on quota/rate-limit errors."""
+    from google.genai import types
+
+    response = client.models.generate_content(
+        model=model,
+        contents=user_message,
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+        ),
+    )
+    return response.text
+
+
+def _is_quota_error(exc: Exception) -> bool:
+    """Return True if the exception looks like a Gemini quota / rate-limit error."""
+    try:
+        from google.api_core.exceptions import ResourceExhausted, TooManyRequests
+        if isinstance(exc, (ResourceExhausted, TooManyRequests)):
+            return True
+    except ImportError:
+        pass
+    # Catch generic ClientError / ServerError whose message mentions quota or rate
+    msg = str(exc).lower()
+    return any(kw in msg for kw in ("quota", "resource exhausted", "rate limit", "429"))
+
+
 def _llm_call(system_prompt: str, user_message: str) -> str:
     """Generic LLM call using the configured provider."""
     provider = config.LLM_PROVIDER
 
     if provider == "gemini":
         from google import genai
-        from google.genai import types
 
         client = genai.Client(api_key=config.GEMINI_API_KEY)
-        response = client.models.generate_content(
-            model=config.GEMINI_MODEL,
-            contents=user_message,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-            ),
+        models_to_try = [config.GEMINI_MODEL] + getattr(
+            config, "GEMINI_FALLBACK_MODELS", []
         )
-        return response.text
+
+        last_err: Exception | None = None
+        for model in models_to_try:
+            try:
+                result = _gemini_generate(client, model, system_prompt, user_message)
+                if model != config.GEMINI_MODEL:
+                    logger.info("Gemini fallback succeeded with model: %s", model)
+                return result
+            except Exception as exc:
+                if _is_quota_error(exc) and model != models_to_try[-1]:
+                    logger.warning(
+                        "Model %s hit quota limit: %s — trying next fallback",
+                        model, exc,
+                    )
+                    last_err = exc
+                    continue
+                raise
+
+        # All models exhausted (shouldn't normally reach here, but just in case)
+        raise last_err  # type: ignore[misc]
 
     elif provider == "openai":
         from openai import OpenAI
