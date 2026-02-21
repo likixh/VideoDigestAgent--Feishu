@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Dashboard</h1>
+
+<!-- Stat cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-value">{{ stats.sent }}</div>
+                    <div class="stat-label">Sent</div>
+                </div>
+                <div class="stat-icon" style="background: #dcfce7; color: #166534;">
+                    <i class="bi bi-check-circle"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-value">{{ stats.failed }}</div>
+                    <div class="stat-label">Failed</div>
+                </div>
+                <div class="stat-icon" style="background: #fee2e2; color: #991b1b;">
+                    <i class="bi bi-exclamation-circle"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-value">{{ stats.total }}</div>
+                    <div class="stat-label">Processed</div>
+                </div>
+                <div class="stat-icon" style="background: #e0e7ff; color: #3730a3;">
+                    <i class="bi bi-film"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card stat-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="stat-value">{{ stats.channels }}</div>
+                    <div class="stat-label">Channels</div>
+                </div>
+                <div class="stat-icon" style="background: #fef3c7; color: #92400e;">
+                    <i class="bi bi-broadcast"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Recent activity -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Recent Activity
+                <a href="{{ url_for('archive_page') }}" class="btn btn-sm btn-outline-secondary">
+                    View All
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if recent %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">Date</th>
+                                <th>Channel</th>
+                                <th>Title</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in recent %}
+                            <tr>
+                                <td class="ps-3 text-nowrap">{{ item.date or '—' }}</td>
+                                <td class="text-nowrap">
+                                    {% if item.channel %}@{{ item.channel }}{% else %}—{% endif %}
+                                </td>
+                                <td>
+                                    {% if item.title %}
+                                    <a href="https://www.youtube.com/watch?v={{ item.video_id }}"
+                                       target="_blank" class="text-decoration-none">
+                                        {{ item.title[:60] }}{% if item.title|length > 60 %}...{% endif %}
+                                    </a>
+                                    {% else %}
+                                    {{ item.video_id }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge badge-{{ item.status or 'init' }}">
+                                        {{ item.status or 'seen' }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="bi bi-inbox"></i>
+                    <p>No videos processed yet.<br>Run the agent to get started.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar info -->
+    <div class="col-lg-4">
+        <!-- Config summary -->
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Current Config
+                <a href="{{ url_for('config_page') }}" class="btn btn-sm btn-outline-secondary">
+                    Edit
+                </a>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm table-borderless mb-0" style="font-size: 0.88rem;">
+                    <tr>
+                        <td class="text-muted" style="width: 90px;">Provider</td>
+                        <td><strong>{{ config_info.provider }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Channels</td>
+                        <td>{{ config_info.channels }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Output</td>
+                        <td>{{ config_info.output_mode }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Languages</td>
+                        <td>{{ config_info.languages }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Polling</td>
+                        <td>every {{ (config_info.poll_interval|int / 60)|int }} min</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Quick actions -->
+        <div class="card mb-3">
+            <div class="card-header">Quick Actions</div>
+            <div class="card-body d-grid gap-2">
+                <a href="{{ url_for('run_page') }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-play-fill"></i> Run Agent
+                </a>
+                <a href="{{ url_for('archive_page') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-archive"></i> Archive ({{ summary_count }} files)
+                </a>
+            </div>
+        </div>
+
+        <!-- Agent status -->
+        <div class="card">
+            <div class="card-header">Agent Status</div>
+            <div class="card-body text-center py-3">
+                <span class="status-dot {% if agent_running %}status-running{% else %}status-idle{% endif %}"
+                      style="width: 12px; height: 12px;"></span>
+                <span class="fw-semibold">
+                    {{ "Running" if agent_running else "Idle" }}
+                </span>
+                {% if agent_running %}
+                <br>
+                <a href="{{ url_for('run_page') }}" class="btn btn-sm btn-outline-primary mt-2">
+                    View Console
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

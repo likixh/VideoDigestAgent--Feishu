@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Run Agent{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Run Agent</h1>
+
+<!-- Mode selection -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-xl">
+        <div class="mode-card selected" data-mode="once" onclick="selectMode(this)">
+            <div class="mode-icon text-primary"><i class="bi bi-play-fill"></i></div>
+            <div class="mode-label">Run Once</div>
+            <div class="mode-desc">Check for new videos now</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl">
+        <div class="mode-card" data-mode="poll" onclick="selectMode(this)">
+            <div class="mode-icon text-success"><i class="bi bi-arrow-repeat"></i></div>
+            <div class="mode-label">Start Polling</div>
+            <div class="mode-desc">Continuous monitoring</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl">
+        <div class="mode-card" data-mode="video" onclick="selectMode(this)">
+            <div class="mode-icon text-info"><i class="bi bi-link-45deg"></i></div>
+            <div class="mode-label">Single Video</div>
+            <div class="mode-desc">Process specific video</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl">
+        <div class="mode-card" data-mode="retry" onclick="selectMode(this)">
+            <div class="mode-icon text-warning"><i class="bi bi-arrow-clockwise"></i></div>
+            <div class="mode-label">Retry Failed</div>
+            <div class="mode-desc">Re-process failed videos</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl">
+        <div class="mode-card" data-mode="check" onclick="selectMode(this)">
+            <div class="mode-icon text-secondary"><i class="bi bi-shield-check"></i></div>
+            <div class="mode-label">Check Config</div>
+            <div class="mode-desc">Validate settings</div>
+        </div>
+    </div>
+</div>
+
+<!-- Options -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <!-- Video ID input (shown only for single video mode) -->
+            <div class="col-md-5" id="videoIdGroup" style="display: none;">
+                <label class="form-label" for="videoIdInput">Video ID</label>
+                <input type="text" class="form-control" id="videoIdInput"
+                       placeholder="e.g. dQw4w9WgXcQ">
+                <small class="text-muted">The ID from the YouTube URL</small>
+            </div>
+
+            <!-- Dry run toggle -->
+            <div class="col-auto">
+                <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" id="dryRunToggle">
+                    <label class="form-check-label" for="dryRunToggle">
+                        Dry Run <small class="text-muted">(skip sending email)</small>
+                    </label>
+                </div>
+            </div>
+
+            <div class="col-auto ms-auto">
+                <button class="btn btn-primary px-4" id="startBtn" onclick="startAgent()">
+                    <i class="bi bi-play-fill"></i> Start
+                </button>
+                <button class="btn btn-danger px-4" id="stopBtn" onclick="stopAgent()" style="display: none;">
+                    <i class="bi bi-stop-fill"></i> Stop
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Console output -->
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <span class="fw-semibold" style="font-size: 0.9rem;">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Idle</span>
+    </span>
+    <button class="btn btn-sm btn-outline-secondary" onclick="clearConsole()">
+        <i class="bi bi-trash3"></i> Clear
+    </button>
+</div>
+<div class="console" id="console">Waiting to start...</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedMode = 'once';
+let polling = null;
+
+function selectMode(el) {
+    document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedMode = el.dataset.mode;
+
+    // Show/hide video ID input
+    document.getElementById('videoIdGroup').style.display =
+        selectedMode === 'video' ? '' : 'none';
+}
+
+function startAgent() {
+    const dryRun = document.getElementById('dryRunToggle').checked;
+    const videoId = document.getElementById('videoIdInput').value.trim();
+
+    const body = { mode: selectedMode, dry_run: dryRun };
+    if (selectedMode === 'video') body.video_id = videoId;
+
+    fetch('/api/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        setRunningUI(true);
+        startPolling();
+    })
+    .catch(err => alert('Failed to start: ' + err));
+}
+
+function stopAgent() {
+    fetch('/api/stop', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) alert(data.error);
+    })
+    .catch(err => alert('Failed to stop: ' + err));
+}
+
+function startPolling() {
+    if (polling) return;
+    polling = setInterval(fetchStatus, 800);
+    fetchStatus();
+}
+
+function stopPolling() {
+    if (polling) {
+        clearInterval(polling);
+        polling = null;
+    }
+}
+
+function fetchStatus() {
+    fetch('/api/status')
+    .then(r => r.json())
+    .then(data => {
+        updateConsole(data.output || []);
+        if (data.running) {
+            setRunningUI(true);
+        } else {
+            setRunningUI(false);
+            if (data.exit_code !== null) {
+                stopPolling();
+            }
+        }
+    })
+    .catch(() => {});
+}
+
+function updateConsole(lines) {
+    const el = document.getElementById('console');
+    let html = '';
+    for (const line of lines) {
+        let cls = '';
+        if (line.includes('ERROR') || line.includes('FAIL')) cls = 'line-error';
+        else if (line.includes('WARNING')) cls = 'line-warning';
+        else if (line.includes('[INFO]')) cls = 'line-info';
+        else if (line.startsWith('$')) cls = 'line-cmd';
+        else if (line.includes('--- Agent finished') || line.includes('Done:')) cls = 'line-done';
+
+        const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        html += cls ? `<span class="${cls}">${escaped}</span>\n` : escaped + '\n';
+    }
+    el.innerHTML = html;
+    el.scrollTop = el.scrollHeight;
+}
+
+function setRunningUI(running) {
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+
+    dot.className = 'status-dot ' + (running ? 'status-running' : 'status-idle');
+    text.textContent = running ? 'Running' : 'Idle';
+    startBtn.style.display = running ? 'none' : '';
+    stopBtn.style.display = running ? '' : 'none';
+}
+
+function clearConsole() {
+    document.getElementById('console').innerHTML = 'Waiting to start...';
+}
+
+// On page load, check if agent is already running
+fetchStatus();
+startPolling();
+</script>
+{% endblock %}

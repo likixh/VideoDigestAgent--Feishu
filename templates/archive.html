@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Archive{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Archive</h1>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" role="tablist">
+    <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#historyTab" type="button">
+            <i class="bi bi-clock-history"></i> Processing History
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#summariesTab" type="button">
+            <i class="bi bi-file-earmark-text"></i> Saved Summaries
+            {% if summary_files %}
+            <span class="badge bg-secondary ms-1">{{ summary_files|length }}</span>
+            {% endif %}
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- History tab -->
+    <div class="tab-pane fade show active" id="historyTab" role="tabpanel">
+        <!-- Filters -->
+        <div class="mb-3">
+            <a href="{{ url_for('archive_page', status='all') }}"
+               class="filter-pill {% if status_filter == 'all' %}active{% endif %}">All</a>
+            <a href="{{ url_for('archive_page', status='sent') }}"
+               class="filter-pill {% if status_filter == 'sent' %}active{% endif %}">Sent</a>
+            <a href="{{ url_for('archive_page', status='failed') }}"
+               class="filter-pill {% if status_filter == 'failed' %}active{% endif %}">Failed</a>
+            <a href="{{ url_for('archive_page', status='init') }}"
+               class="filter-pill {% if status_filter == 'init' %}active{% endif %}">Seen</a>
+        </div>
+
+        {% if history %}
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-3">Date</th>
+                            <th>Channel</th>
+                            <th>Title</th>
+                            <th>Status</th>
+                            <th>Error</th>
+                            <th class="text-center">Link</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in history %}
+                        <tr>
+                            <td class="ps-3 text-nowrap">{{ item.date or '—' }}</td>
+                            <td class="text-nowrap">
+                                {% if item.channel %}@{{ item.channel }}{% else %}—{% endif %}
+                            </td>
+                            <td>{{ item.title[:70] if item.title else item.video_id }}{% if item.title and item.title|length > 70 %}...{% endif %}</td>
+                            <td>
+                                <span class="badge badge-{{ item.status or 'init' }}">
+                                    {{ item.status or 'seen' }}
+                                </span>
+                                {% if item.retry_count and item.retry_count > 0 %}
+                                <small class="text-muted">(x{{ item.retry_count }})</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.error %}
+                                <small class="text-danger" title="{{ item.error }}">
+                                    {{ item.error[:40] }}{% if item.error|length > 40 %}...{% endif %}
+                                </small>
+                                {% else %}—{% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="https://www.youtube.com/watch?v={{ item.video_id }}"
+                                   target="_blank" class="btn btn-sm btn-outline-secondary" title="Open on YouTube">
+                                    <i class="bi bi-box-arrow-up-right"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <p class="text-muted mt-2" style="font-size: 0.82rem;">
+            Showing {{ history|length }} record(s).
+        </p>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-inbox"></i>
+            <p>No records found{% if status_filter != 'all' %} for filter "{{ status_filter }}"{% endif %}.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Summaries tab -->
+    <div class="tab-pane fade" id="summariesTab" role="tabpanel">
+        {% if summary_files %}
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-3">File</th>
+                            <th>Modified</th>
+                            <th>Size</th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for f in summary_files %}
+                        <tr>
+                            <td class="ps-3">
+                                <i class="bi bi-file-earmark-text text-muted me-1"></i>
+                                {{ f.filename }}
+                            </td>
+                            <td class="text-nowrap">{{ f.modified }}</td>
+                            <td>{{ "%.1f"|format(f.size / 1024) }} KB</td>
+                            <td class="text-center">
+                                <a href="{{ url_for('view_summary', filename=f.filename) }}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-file-earmark"></i>
+            <p>No saved summaries yet.<br>
+               Set <strong>OUTPUT_MODE</strong> to "local" or "both" in the config to save summaries locally.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
