@@ -13,35 +13,35 @@
         <!-- Sidebar -->
         <nav class="sidebar d-flex flex-column">
             <div class="sidebar-brand">
-                <i class="bi bi-youtube"></i> YT Summarizer
+                <i class="bi bi-play-circle-fill"></i> YT Summarizer
             </div>
             <ul class="nav flex-column mt-2">
                 <li class="nav-item">
                     <a class="nav-link {% if active == 'dashboard' %}active{% endif %}"
                        href="{{ url_for('dashboard') }}">
-                        <i class="bi bi-speedometer2"></i> Dashboard
+                        <i class="bi bi-square-half"></i> Dashboard
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {% if active == 'config' %}active{% endif %}"
                        href="{{ url_for('config_page') }}">
-                        <i class="bi bi-gear"></i> Configuration
+                        <i class="bi bi-slider"></i> Configuration
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {% if active == 'run' %}active{% endif %}"
                        href="{{ url_for('run_page') }}">
-                        <i class="bi bi-play-circle"></i> Run Agent
+                        <i class="bi bi-terminal"></i> Run Agent
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {% if active == 'archive' %}active{% endif %}"
                        href="{{ url_for('archive_page') }}">
-                        <i class="bi bi-archive"></i> Archive
+                        <i class="bi bi-tray"></i> Archive
                     </a>
                 </li>
             </ul>
-            <div class="mt-auto sidebar-footer d-none d-md-block">
+            <div class="mt-auto sidebar-footer d-none d-md-flex">
                 <span class="status-dot {% if agent_running %}status-running{% else %}status-idle{% endif %}"></span>
                 {{ "Agent Running" if agent_running else "Agent Idle" }}
             </div>
