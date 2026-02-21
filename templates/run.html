@@ -8,35 +8,35 @@
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-4 col-xl">
         <div class="mode-card selected" data-mode="once" onclick="selectMode(this)">
-            <div class="mode-icon text-primary"><i class="bi bi-play-fill"></i></div>
+            <div class="mode-icon"><i class="bi bi-play-fill"></i></div>
             <div class="mode-label">Run Once</div>
             <div class="mode-desc">Check for new videos now</div>
         </div>
     </div>
     <div class="col-6 col-md-4 col-xl">
         <div class="mode-card" data-mode="poll" onclick="selectMode(this)">
-            <div class="mode-icon text-success"><i class="bi bi-arrow-repeat"></i></div>
+            <div class="mode-icon"><i class="bi bi-arrow-repeat"></i></div>
             <div class="mode-label">Start Polling</div>
             <div class="mode-desc">Continuous monitoring</div>
         </div>
     </div>
     <div class="col-6 col-md-4 col-xl">
         <div class="mode-card" data-mode="video" onclick="selectMode(this)">
-            <div class="mode-icon text-info"><i class="bi bi-link-45deg"></i></div>
+            <div class="mode-icon"><i class="bi bi-link-45deg"></i></div>
             <div class="mode-label">Single Video</div>
             <div class="mode-desc">Process specific video</div>
         </div>
     </div>
     <div class="col-6 col-md-4 col-xl">
         <div class="mode-card" data-mode="retry" onclick="selectMode(this)">
-            <div class="mode-icon text-warning"><i class="bi bi-arrow-clockwise"></i></div>
+            <div class="mode-icon"><i class="bi bi-arrow-clockwise"></i></div>
             <div class="mode-label">Retry Failed</div>
             <div class="mode-desc">Re-process failed videos</div>
         </div>
     </div>
     <div class="col-6 col-md-4 col-xl">
         <div class="mode-card" data-mode="check" onclick="selectMode(this)">
-            <div class="mode-icon text-secondary"><i class="bi bi-shield-check"></i></div>
+            <div class="mode-icon"><i class="bi bi-shield-check"></i></div>
             <div class="mode-label">Check Config</div>
             <div class="mode-desc">Validate settings</div>
         </div>
@@ -79,7 +79,7 @@
 
 <!-- Console output -->
 <div class="d-flex justify-content-between align-items-center mb-2">
-    <span class="fw-semibold" style="font-size: 0.9rem;">
+    <span class="fw-semibold" style="font-size: 0.85rem; color: var(--text-secondary);">
         <span class="status-dot" id="statusDot"></span>
         <span id="statusText">Idle</span>
     </span>

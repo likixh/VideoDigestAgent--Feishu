@@ -13,8 +13,8 @@
                     <div class="stat-value">{{ stats.sent }}</div>
                     <div class="stat-label">Sent</div>
                 </div>
-                <div class="stat-icon" style="background: #dcfce7; color: #166534;">
-                    <i class="bi bi-check-circle"></i>
+                <div class="stat-icon" style="background: rgba(52, 199, 89, 0.12); color: #1B7A32;">
+                    <i class="bi bi-check-circle-fill"></i>
                 </div>
             </div>
         </div>
@@ -26,8 +26,8 @@
                     <div class="stat-value">{{ stats.failed }}</div>
                     <div class="stat-label">Failed</div>
                 </div>
-                <div class="stat-icon" style="background: #fee2e2; color: #991b1b;">
-                    <i class="bi bi-exclamation-circle"></i>
+                <div class="stat-icon" style="background: rgba(255, 59, 48, 0.1); color: #C62828;">
+                    <i class="bi bi-exclamation-circle-fill"></i>
                 </div>
             </div>
         </div>
@@ -39,7 +39,7 @@
                     <div class="stat-value">{{ stats.total }}</div>
                     <div class="stat-label">Processed</div>
                 </div>
-                <div class="stat-icon" style="background: #e0e7ff; color: #3730a3;">
+                <div class="stat-icon" style="background: rgba(88, 86, 214, 0.1); color: #5856D6;">
                     <i class="bi bi-film"></i>
                 </div>
             </div>
@@ -52,7 +52,7 @@
                     <div class="stat-value">{{ stats.channels }}</div>
                     <div class="stat-label">Channels</div>
                 </div>
-                <div class="stat-icon" style="background: #fef3c7; color: #92400e;">
+                <div class="stat-icon" style="background: rgba(255, 149, 0, 0.1); color: #92400E;">
                     <i class="bi bi-broadcast"></i>
                 </div>
             </div>
@@ -92,7 +92,7 @@
                                 <td>
                                     {% if item.title %}
                                     <a href="https://www.youtube.com/watch?v={{ item.video_id }}"
-                                       target="_blank" class="text-decoration-none">
+                                       target="_blank">
                                         {{ item.title[:60] }}{% if item.title|length > 60 %}...{% endif %}
                                     </a>
                                     {% else %}
@@ -130,25 +130,25 @@
                 </a>
             </div>
             <div class="card-body">
-                <table class="table table-sm table-borderless mb-0" style="font-size: 0.88rem;">
+                <table class="table table-sm table-borderless mb-0" style="font-size: 0.85rem;">
                     <tr>
-                        <td class="text-muted" style="width: 90px;">Provider</td>
+                        <td style="width: 90px; color: var(--text-secondary); font-weight: 500;">Provider</td>
                         <td><strong>{{ config_info.provider }}</strong></td>
                     </tr>
                     <tr>
-                        <td class="text-muted">Channels</td>
+                        <td style="color: var(--text-secondary); font-weight: 500;">Channels</td>
                         <td>{{ config_info.channels }}</td>
                     </tr>
                     <tr>
-                        <td class="text-muted">Output</td>
+                        <td style="color: var(--text-secondary); font-weight: 500;">Output</td>
                         <td>{{ config_info.output_mode }}</td>
                     </tr>
                     <tr>
-                        <td class="text-muted">Languages</td>
+                        <td style="color: var(--text-secondary); font-weight: 500;">Languages</td>
                         <td>{{ config_info.languages }}</td>
                     </tr>
                     <tr>
-                        <td class="text-muted">Polling</td>
+                        <td style="color: var(--text-secondary); font-weight: 500;">Polling</td>
                         <td>every {{ (config_info.poll_interval|int / 60)|int }} min</td>
                     </tr>
                 </table>
@@ -163,7 +163,7 @@
                     <i class="bi bi-play-fill"></i> Run Agent
                 </a>
                 <a href="{{ url_for('archive_page') }}" class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-archive"></i> Archive ({{ summary_count }} files)
+                    <i class="bi bi-tray"></i> Archive ({{ summary_count }} files)
                 </a>
             </div>
         </div>

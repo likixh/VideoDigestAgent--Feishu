@@ -4,22 +4,24 @@
 {% block content %}
 <h1 class="page-title">Archive</h1>
 
-<!-- Tabs -->
-<ul class="nav nav-tabs mb-4" role="tablist">
-    <li class="nav-item">
-        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#historyTab" type="button">
-            <i class="bi bi-clock-history"></i> Processing History
-        </button>
-    </li>
-    <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#summariesTab" type="button">
-            <i class="bi bi-file-earmark-text"></i> Saved Summaries
-            {% if summary_files %}
-            <span class="badge bg-secondary ms-1">{{ summary_files|length }}</span>
-            {% endif %}
-        </button>
-    </li>
-</ul>
+<!-- Tabs (Apple segmented control style) -->
+<div class="mb-4">
+    <ul class="nav nav-tabs" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#historyTab" type="button">
+                <i class="bi bi-clock-history"></i> History
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#summariesTab" type="button">
+                <i class="bi bi-doc-text"></i> Summaries
+                {% if summary_files %}
+                <span class="badge ms-1">{{ summary_files|length }}</span>
+                {% endif %}
+            </button>
+        </li>
+    </ul>
+</div>
 
 <div class="tab-content">
     <!-- History tab -->
@@ -85,7 +87,7 @@
                 </table>
             </div>
         </div>
-        <p class="text-muted mt-2" style="font-size: 0.82rem;">
+        <p style="font-size: 0.8rem; color: var(--text-tertiary); margin-top: 0.65rem; font-weight: 500;">
             Showing {{ history|length }} record(s).
         </p>
         {% else %}
@@ -114,7 +116,7 @@
                         {% for f in summary_files %}
                         <tr>
                             <td class="ps-3">
-                                <i class="bi bi-file-earmark-text text-muted me-1"></i>
+                                <i class="bi bi-file-earmark-text" style="color: var(--text-tertiary);"></i>
                                 {{ f.filename }}
                             </td>
                             <td class="text-nowrap">{{ f.modified }}</td>
