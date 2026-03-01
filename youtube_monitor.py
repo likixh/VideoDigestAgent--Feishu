@@ -258,7 +258,6 @@ def _search_youtube(youtube, query: str, published_after: str,
             order="relevance",
             publishedAfter=published_after,
             maxResults=max_results,
-            videoDuration="medium",
         ).execute()
         _track_quota(100)
     except Exception as e:
