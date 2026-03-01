@@ -41,7 +41,7 @@ YOUTUBE_SEARCH_QUERIES: list[str] = [
     q.strip() for q in _raw_search_queries.split(",") if q.strip()
 ]
 YOUTUBE_SEARCH_ENABLED = len(YOUTUBE_SEARCH_QUERIES) > 0
-YOUTUBE_SEARCH_MAX_RESULTS = int(os.getenv("YOUTUBE_SEARCH_MAX_RESULTS", "10"))
+YOUTUBE_SEARCH_MAX_RESULTS = int(os.getenv("YOUTUBE_SEARCH_MAX_RESULTS", "5"))
 YOUTUBE_SEARCH_INTERVAL = int(os.getenv("YOUTUBE_SEARCH_INTERVAL", "14400"))
 YOUTUBE_SEARCH_QUOTA_BUDGET = int(os.getenv("YOUTUBE_SEARCH_QUOTA_BUDGET", "5000"))
 
@@ -54,6 +54,8 @@ YOUTUBE_SEARCH_RELEVANCE_KEYWORDS: list[str] = [
     k.strip().lower() for k in _raw_relevance.split(",") if k.strip()
 ]
 YOUTUBE_SEARCH_MIN_DURATION = int(os.getenv("YOUTUBE_SEARCH_MIN_DURATION", "10"))
+YOUTUBE_SEARCH_MAX_TOTAL = int(os.getenv("YOUTUBE_SEARCH_MAX_TOTAL", "15"))
+YOUTUBE_SEARCH_MIN_VIEWS = int(os.getenv("YOUTUBE_SEARCH_MIN_VIEWS", "1000"))
 
 # At least one video source must be configured
 if not YOUTUBE_CHANNELS and not YOUTUBE_SEARCH_ENABLED:

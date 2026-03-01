@@ -59,6 +59,9 @@ def _print_banner() -> None:
         logger.info("  Search:     %s", search_queries)
         logger.info("  Search int: every %d min", config.YOUTUBE_SEARCH_INTERVAL // 60)
         logger.info("  Quota:      %d units/day budget", config.YOUTUBE_SEARCH_QUOTA_BUDGET)
+        logger.info("  Max total:  %d videos/cycle", config.YOUTUBE_SEARCH_MAX_TOTAL)
+        logger.info("  Min views:  %s", f"{config.YOUTUBE_SEARCH_MIN_VIEWS:,}" if config.YOUTUBE_SEARCH_MIN_VIEWS > 0 else "off")
+        logger.info("  Min length: %d min", config.YOUTUBE_SEARCH_MIN_DURATION)
     else:
         logger.info("  Search:     disabled")
     logger.info("  Languages:  %s", languages)
