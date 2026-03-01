@@ -199,22 +199,28 @@ def _pre_filter_video(video: dict) -> bool:
     return any(kw in text for kw in config.YOUTUBE_SEARCH_RELEVANCE_KEYWORDS)
 
 
-def _filter_by_duration(youtube, videos: list[dict]) -> list[dict]:
-    """Remove videos shorter than YOUTUBE_SEARCH_MIN_DURATION minutes."""
-    if not videos or config.YOUTUBE_SEARCH_MIN_DURATION <= 0:
+def _filter_by_duration_and_views(youtube, videos: list[dict]) -> list[dict]:
+    """Remove short videos and fetch view counts for ranking.
+
+    Fetches both contentDetails (duration) and statistics (viewCount) in a
+    single API call per batch of 50 videos (1 quota unit each).
+    """
+    if not videos:
         return videos
 
     video_ids = [v["video_id"] for v in videos]
     durations = {}
+    view_counts = {}
 
     for i in range(0, len(video_ids), 50):
         batch = video_ids[i : i + 50]
         try:
             resp = youtube.videos().list(
-                part="contentDetails", id=",".join(batch)
+                part="contentDetails,statistics", id=",".join(batch)
             ).execute()
             _track_quota(1)
             for item in resp.get("items", []):
+                # Duration
                 dur = item["contentDetails"]["duration"]
                 match = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", dur)
                 if match:
@@ -222,21 +228,58 @@ def _filter_by_duration(youtube, videos: list[dict]) -> list[dict]:
                     minutes = int(match.group(2) or 0)
                     seconds = int(match.group(3) or 0)
                     durations[item["id"]] = hours * 60 + minutes + seconds / 60
+                # View count
+                stats = item.get("statistics", {})
+                view_counts[item["id"]] = int(stats.get("viewCount", 0))
         except Exception as e:
-            logger.warning("Duration check failed: %s", e)
+            logger.warning("Duration/views check failed: %s", e)
 
+    # Filter by minimum duration
     min_dur = config.YOUTUBE_SEARCH_MIN_DURATION
     filtered = []
     for v in videos:
         dur = durations.get(v["video_id"], 999)
-        if dur >= min_dur:
-            filtered.append(v)
-        else:
+        if min_dur > 0 and dur < min_dur:
             logger.debug("Skipping short video (%.1f min): %s", dur, v["title"])
+            continue
+        v["_view_count"] = view_counts.get(v["video_id"], 0)
+        v["_duration"] = durations.get(v["video_id"], 0)
+        filtered.append(v)
 
-    skipped = len(videos) - len(filtered)
-    if skipped > 0:
-        logger.info("Filtered out %d short video(s) (< %d min)", skipped, min_dur)
+    dur_skipped = len(videos) - len(filtered)
+    if dur_skipped > 0:
+        logger.info("Filtered out %d short video(s) (< %d min)", dur_skipped, min_dur)
+
+    # Filter by minimum view count
+    min_views = config.YOUTUBE_SEARCH_MIN_VIEWS
+    if min_views > 0:
+        before = len(filtered)
+        filtered = [v for v in filtered if v["_view_count"] >= min_views]
+        views_skipped = before - len(filtered)
+        if views_skipped > 0:
+            logger.info("Filtered out %d low-view video(s) (< %d views)", views_skipped, min_views)
+
+    # Sort by view count descending (most popular first)
+    filtered.sort(key=lambda v: v["_view_count"], reverse=True)
+
+    # Apply total cap
+    max_total = config.YOUTUBE_SEARCH_MAX_TOTAL
+    if max_total > 0 and len(filtered) > max_total:
+        logger.info("Capping search results from %d to %d (YOUTUBE_SEARCH_MAX_TOTAL)",
+                     len(filtered), max_total)
+        filtered = filtered[:max_total]
+
+    # Log the final selection
+    for v in filtered:
+        logger.info("  Selected: %s (%.0f min, %s views) — %s",
+                     v["title"][:50], v["_duration"],
+                     f"{v['_view_count']:,}", v.get("channel", "?"))
+
+    # Clean up internal fields
+    for v in filtered:
+        v.pop("_view_count", None)
+        v.pop("_duration", None)
+
     return filtered
 
 
@@ -330,9 +373,9 @@ def get_search_videos() -> list[dict]:
 
         logger.info("Search '%s': %d new result(s)", query, len(results))
 
-    # Filter out shorts / very short clips
+    # Filter by duration, view count, and cap total
     if all_new:
-        all_new = _filter_by_duration(youtube, all_new)
+        all_new = _filter_by_duration_and_views(youtube, all_new)
 
     _mark_search_done()
     logger.info(
