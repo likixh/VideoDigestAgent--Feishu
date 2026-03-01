@@ -307,13 +307,9 @@ def get_search_videos() -> list[dict]:
     youtube = build("youtube", "v3", developerKey=config.YOUTUBE_API_KEY)
     processed = get_processed_ids()
 
-    # Time window: since last search (with 1h overlap), or last 24h for first run
-    state = _load_search_state()
-    last_search = state.get("last_search_time", 0)
-    if last_search > 0:
-        since = datetime.fromtimestamp(last_search - 3600, tz=timezone.utc)
-    else:
-        since = datetime.now(timezone.utc) - timedelta(hours=24)
+    # Always search the last 10 days — combined with order="relevance" this
+    # surfaces the best recent content.  Duplicates are filtered by history.
+    since = datetime.now(timezone.utc) - timedelta(days=10)
     published_after = since.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     all_new = []
