@@ -62,8 +62,7 @@ CONFIG_SECTIONS = [
                 "label": "Channels",
                 "type": "text",
                 "placeholder": "RhinoFinance,TechChannel",
-                "help": "Comma-separated handles (without @)",
-                "required": True,
+                "help": "Comma-separated handles (without @). Can be empty if search is configured.",
             },
             {
                 "key": "YOUTUBE_API_KEY",
@@ -71,6 +70,56 @@ CONFIG_SECTIONS = [
                 "type": "password",
                 "placeholder": "YouTube Data API v3 key",
                 "required": True,
+            },
+        ],
+    },
+    {
+        "id": "youtube_search",
+        "title": "YouTube Search",
+        "icon": "bi-search",
+        "fields": [
+            {
+                "key": "YOUTUBE_SEARCH_QUERIES",
+                "label": "Search Queries",
+                "type": "text",
+                "placeholder": "AI news,artificial intelligence,machine learning",
+                "help": "Comma-separated search terms. Leave empty to disable search.",
+            },
+            {
+                "key": "YOUTUBE_SEARCH_MAX_RESULTS",
+                "label": "Results per Query",
+                "type": "number",
+                "default": "10",
+                "help": "Max results per search query (1-50)",
+            },
+            {
+                "key": "YOUTUBE_SEARCH_INTERVAL",
+                "label": "Search Interval (seconds)",
+                "type": "number",
+                "default": "14400",
+                "help": "How often to search (14400 = every 4 hours)",
+            },
+            {
+                "key": "YOUTUBE_SEARCH_QUOTA_BUDGET",
+                "label": "Daily Quota Budget",
+                "type": "number",
+                "default": "5000",
+                "help": "Max YouTube API units for search per day (total limit: 10,000)",
+            },
+            {
+                "key": "YOUTUBE_SEARCH_RELEVANCE_KEYWORDS",
+                "label": "Relevance Keywords",
+                "type": "text",
+                "placeholder": "AI,machine learning,LLM,GPT",
+                "help": "Pre-filter: skip results whose title doesn't contain any of these",
+                "default": "AI,artificial intelligence,machine learning,deep learning,LLM,GPT,neural network,transformer,AGI,GenAI",
+            },
+            {
+                "key": "YOUTUBE_SEARCH_MIN_DURATION",
+                "label": "Min Duration (minutes)",
+                "type": "number",
+                "default": "10",
+                "help": "Skip videos shorter than this (filters out short clips)",
             },
         ],
     },
@@ -414,9 +463,11 @@ def dashboard():
     channels = env.get("YOUTUBE_CHANNELS", "")
     channel_count = len([c for c in channels.split(",") if c.strip()]) if channels else 0
 
+    search_queries = env.get("YOUTUBE_SEARCH_QUERIES", "")
     config_info = {
         "provider": env.get("LLM_PROVIDER", "gemini"),
         "channels": channels or "—",
+        "search_queries": search_queries or "disabled",
         "output_mode": env.get("OUTPUT_MODE", "email"),
         "languages": env.get("SUMMARY_LANGUAGES", "English"),
         "poll_interval": env.get("POLL_INTERVAL", "3600"),

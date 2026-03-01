@@ -53,18 +53,20 @@ def get_processed_ids() -> set[str]:
     }
 
 
-def mark_sent(video_id: str, title: str, channel: str) -> None:
+def mark_sent(video_id: str, title: str, channel: str, source: str = "channel") -> None:
     history = _load_history()
     history[video_id] = {
         "status": "sent",
         "title": title,
         "channel": channel,
+        "source": source,
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
     }
     _save_history(history)
 
 
-def mark_failed(video_id: str, title: str, channel: str, error: str) -> None:
+def mark_failed(video_id: str, title: str, channel: str, error: str,
+                source: str = "channel") -> None:
     history = _load_history()
     prev = history.get(video_id, {})
     retry_count = prev.get("retry_count", 0) + 1
@@ -72,6 +74,7 @@ def mark_failed(video_id: str, title: str, channel: str, error: str) -> None:
         "status": "failed",
         "title": title,
         "channel": channel,
+        "source": source,
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         "error": error,
         "retry_count": retry_count,
