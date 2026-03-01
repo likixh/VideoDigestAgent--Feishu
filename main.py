@@ -44,7 +44,7 @@ def _print_banner() -> None:
         "anthropic": getattr(config, "ANTHROPIC_MODEL", ""),
     }.get(provider, "")
 
-    channels = ", ".join(f"@{ch}" for ch in config.YOUTUBE_CHANNELS)
+    channels = ", ".join(f"@{ch}" for ch in config.YOUTUBE_CHANNELS) if config.YOUTUBE_CHANNELS else "none"
     languages = ", ".join(config.SUMMARY_LANGUAGES)
     recipients = ", ".join(config.RECIPIENT_EMAILS) if config.RECIPIENT_EMAILS else "—"
     verify = "on" if config.VERIFY_SUMMARY else "off"
@@ -54,6 +54,13 @@ def _print_banner() -> None:
     logger.info("-" * 60)
     logger.info("  LLM:        %s (%s)", provider, model_name)
     logger.info("  Channels:   %s", channels)
+    if config.YOUTUBE_SEARCH_ENABLED:
+        search_queries = ", ".join(config.YOUTUBE_SEARCH_QUERIES)
+        logger.info("  Search:     %s", search_queries)
+        logger.info("  Search int: every %d min", config.YOUTUBE_SEARCH_INTERVAL // 60)
+        logger.info("  Quota:      %d units/day budget", config.YOUTUBE_SEARCH_QUOTA_BUDGET)
+    else:
+        logger.info("  Search:     disabled")
     logger.info("  Languages:  %s", languages)
     logger.info("  Output:     %s", config.OUTPUT_MODE)
     if config.OUTPUT_MODE in ("email", "both"):
@@ -108,21 +115,26 @@ def process_video(video: dict, dry_run: bool = False) -> None:
     title = video["title"]
     channel = video.get("channel", "unknown")
     published_at = video.get("published_at", "")
+    source = video.get("source", "channel")
 
-    logger.info("Processing: %s (%s) from @%s", title, vid_id, channel)
+    if source == "search":
+        source_label = f"search:'{video.get('search_query', '?')}'"
+    else:
+        source_label = f"@{channel}"
+    logger.info("Processing: %s (%s) from %s", title, vid_id, source_label)
 
     try:
         transcript = get_transcript(vid_id)
     except RuntimeError as e:
         logger.warning("Skipping %s — %s", vid_id, e)
-        mark_failed(vid_id, title, channel, str(e))
+        mark_failed(vid_id, title, channel, str(e), source=source)
         return False
 
     try:
         summaries, content_type = summarize(title, transcript)
     except Exception as e:
         logger.error("Summarization failed for %s: %s", vid_id, e)
-        mark_failed(vid_id, title, channel, str(e))
+        mark_failed(vid_id, title, channel, str(e), source=source)
         return False
 
     # ── Deliver output based on OUTPUT_MODE ────────────────────────
@@ -148,10 +160,10 @@ def process_video(video: dict, dry_run: bool = False) -> None:
             print(f"\n--- {lang} ---\n")
             print(summary)
         print(f"\n{'='*60}\n")
-        mark_failed(vid_id, title, channel, f"email: {email_err}")
+        mark_failed(vid_id, title, channel, f"email: {email_err}", source=source)
         return False
 
-    mark_sent(vid_id, title, channel)
+    mark_sent(vid_id, title, channel, source=source)
     logger.info("Done: %s", title)
     return True
 

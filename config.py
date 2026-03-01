@@ -31,14 +31,36 @@ def _require_for_provider(var: str, provider: str) -> str:
 YOUTUBE_API_KEY = _require("YOUTUBE_API_KEY")
 
 _raw_channels = os.getenv("YOUTUBE_CHANNELS", "")
-if not _raw_channels.strip():
-    raise RuntimeError(
-        "Missing required environment variable: YOUTUBE_CHANNELS. "
-        "Set it to a comma-separated list of YouTube handles (without @)."
-    )
 YOUTUBE_CHANNELS: list[str] = [
     ch.strip() for ch in _raw_channels.split(",") if ch.strip()
 ]
+
+# ── YouTube Search (optional) ────────────────────────────
+_raw_search_queries = os.getenv("YOUTUBE_SEARCH_QUERIES", "")
+YOUTUBE_SEARCH_QUERIES: list[str] = [
+    q.strip() for q in _raw_search_queries.split(",") if q.strip()
+]
+YOUTUBE_SEARCH_ENABLED = len(YOUTUBE_SEARCH_QUERIES) > 0
+YOUTUBE_SEARCH_MAX_RESULTS = int(os.getenv("YOUTUBE_SEARCH_MAX_RESULTS", "10"))
+YOUTUBE_SEARCH_INTERVAL = int(os.getenv("YOUTUBE_SEARCH_INTERVAL", "14400"))
+YOUTUBE_SEARCH_QUOTA_BUDGET = int(os.getenv("YOUTUBE_SEARCH_QUOTA_BUDGET", "5000"))
+
+_raw_relevance = os.getenv(
+    "YOUTUBE_SEARCH_RELEVANCE_KEYWORDS",
+    "AI,artificial intelligence,machine learning,deep learning,LLM,GPT,"
+    "neural network,transformer,AGI,GenAI",
+)
+YOUTUBE_SEARCH_RELEVANCE_KEYWORDS: list[str] = [
+    k.strip().lower() for k in _raw_relevance.split(",") if k.strip()
+]
+YOUTUBE_SEARCH_MIN_DURATION = int(os.getenv("YOUTUBE_SEARCH_MIN_DURATION", "3"))
+
+# At least one video source must be configured
+if not YOUTUBE_CHANNELS and not YOUTUBE_SEARCH_ENABLED:
+    raise RuntimeError(
+        "No video sources configured. Set YOUTUBE_CHANNELS and/or "
+        "YOUTUBE_SEARCH_QUERIES in your .env file."
+    )
 
 # ── LLM Provider ────────────────────────────────────────
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").lower()
@@ -141,4 +163,10 @@ POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "3600"))
 
 PROCESSED_VIDEOS_FILE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "processed_videos.json"
+)
+SEARCH_STATE_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "search_state.json"
+)
+CHANNEL_CACHE_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "channel_cache.json"
 )

@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 processed_videos.json
+search_state.json
+channel_cache.json
 venv/
 .venv/
 audio_tmp/
