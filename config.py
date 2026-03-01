@@ -53,7 +53,7 @@ _raw_relevance = os.getenv(
 YOUTUBE_SEARCH_RELEVANCE_KEYWORDS: list[str] = [
     k.strip().lower() for k in _raw_relevance.split(",") if k.strip()
 ]
-YOUTUBE_SEARCH_MIN_DURATION = int(os.getenv("YOUTUBE_SEARCH_MIN_DURATION", "3"))
+YOUTUBE_SEARCH_MIN_DURATION = int(os.getenv("YOUTUBE_SEARCH_MIN_DURATION", "10"))
 
 # At least one video source must be configured
 if not YOUTUBE_CHANNELS and not YOUTUBE_SEARCH_ENABLED:
