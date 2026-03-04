@@ -28,7 +28,7 @@ def _require_for_provider(var: str, provider: str) -> str:
 
 
 # ── YouTube ──────────────────────────────────────────────
-YOUTUBE_API_KEY = _require("YOUTUBE_API_KEY")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 
 _raw_channels = os.getenv("YOUTUBE_CHANNELS", "")
 YOUTUBE_CHANNELS: list[str] = [
@@ -57,11 +57,30 @@ YOUTUBE_SEARCH_MIN_DURATION = int(os.getenv("YOUTUBE_SEARCH_MIN_DURATION", "10")
 YOUTUBE_SEARCH_MAX_TOTAL = int(os.getenv("YOUTUBE_SEARCH_MAX_TOTAL", "15"))
 YOUTUBE_SEARCH_MIN_VIEWS = int(os.getenv("YOUTUBE_SEARCH_MIN_VIEWS", "1000"))
 
-# At least one video source must be configured
-if not YOUTUBE_CHANNELS and not YOUTUBE_SEARCH_ENABLED:
+# ── Bilibili (optional) ─────────────────────────────────────
+BILIBILI_ENABLED = os.getenv("BILIBILI_ENABLED", "false").lower() in ("true", "1", "yes")
+
+BILIBILI_SESSDATA = os.getenv("BILIBILI_SESSDATA", "")
+BILIBILI_BILI_JCT = os.getenv("BILIBILI_BILI_JCT", "")
+BILIBILI_BUVID3 = os.getenv("BILIBILI_BUVID3", "")
+
+_raw_bilibili_users = os.getenv("BILIBILI_USERS", "")
+BILIBILI_USERS: list[str] = [
+    u.strip() for u in _raw_bilibili_users.split(",") if u.strip()
+]
+
+# YouTube API key is required if any YouTube source is configured
+if (YOUTUBE_CHANNELS or YOUTUBE_SEARCH_ENABLED) and not YOUTUBE_API_KEY:
     raise RuntimeError(
-        "No video sources configured. Set YOUTUBE_CHANNELS and/or "
-        "YOUTUBE_SEARCH_QUERIES in your .env file."
+        "Missing required environment variable: YOUTUBE_API_KEY "
+        "(needed because YOUTUBE_CHANNELS or YOUTUBE_SEARCH_QUERIES is set)"
+    )
+
+# At least one video source must be configured
+if not YOUTUBE_CHANNELS and not YOUTUBE_SEARCH_ENABLED and not BILIBILI_ENABLED:
+    raise RuntimeError(
+        "No video sources configured. Set YOUTUBE_CHANNELS, "
+        "YOUTUBE_SEARCH_QUERIES, and/or BILIBILI_ENABLED in your .env file."
     )
 
 # ── LLM Provider ────────────────────────────────────────

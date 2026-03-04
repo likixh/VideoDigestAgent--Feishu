@@ -53,20 +53,22 @@ def get_processed_ids() -> set[str]:
     }
 
 
-def mark_sent(video_id: str, title: str, channel: str, source: str = "channel") -> None:
+def mark_sent(video_id: str, title: str, channel: str, source: str = "channel",
+              platform: str = "youtube") -> None:
     history = _load_history()
     history[video_id] = {
         "status": "sent",
         "title": title,
         "channel": channel,
         "source": source,
+        "platform": platform,
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
     }
     _save_history(history)
 
 
 def mark_failed(video_id: str, title: str, channel: str, error: str,
-                source: str = "channel") -> None:
+                source: str = "channel", platform: str = "youtube") -> None:
     history = _load_history()
     prev = history.get(video_id, {})
     retry_count = prev.get("retry_count", 0) + 1
@@ -75,6 +77,7 @@ def mark_failed(video_id: str, title: str, channel: str, error: str,
         "title": title,
         "channel": channel,
         "source": source,
+        "platform": platform,
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         "error": error,
         "retry_count": retry_count,
@@ -116,7 +119,8 @@ def get_history() -> list[dict]:
 
 
 def save_summary_to_file(
-    video_id: str, title: str, channel: str, summaries: dict[str, str]
+    video_id: str, title: str, channel: str, summaries: dict[str, str],
+    platform: str = "youtube",
 ) -> str:
     """Save summaries as a local markdown file. Returns the file path."""
     os.makedirs(SUMMARIES_DIR, exist_ok=True)
@@ -124,15 +128,21 @@ def save_summary_to_file(
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     # Sanitize title for filename
     safe_title = "".join(c if c.isalnum() or c in " -_" else "" for c in title)[:50].strip()
-    filename = f"{date_str}_{channel}_{safe_title}.md"
+    platform_tag = f"[{platform}]_" if platform != "youtube" else ""
+    filename = f"{date_str}_{platform_tag}{channel}_{safe_title}.md"
     filepath = os.path.join(SUMMARIES_DIR, filename)
 
-    video_url = f"https://www.youtube.com/watch?v={video_id}"
+    if platform == "bilibili":
+        bvid = video_id.replace("bilibili:", "")
+        video_url = f"https://www.bilibili.com/video/{bvid}"
+    else:
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
 
     lines = [
         f"# {title}",
         f"",
-        f"- **Channel:** @{channel}",
+        f"- **Platform:** {platform.title()}",
+        f"- **Channel:** {channel}",
         f"- **Link:** {video_url}",
         f"- **Date:** {date_str}",
         f"",
