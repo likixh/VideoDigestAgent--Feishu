@@ -5,6 +5,10 @@ python-dotenv>=1.0.1
 yt-dlp>=2024.1.0
 openai-whisper>=20231117
 
+# Bilibili support (optional — needed if BILIBILI_ENABLED=true)
+bilibili-api-python>=17.0.0
+httpx>=0.27.0                # for fetching Bilibili subtitle data
+
 # LLM providers — install the one you plan to use:
 google-genai>=1.0.0             # for LLM_PROVIDER=gemini (free tier)
 openai>=1.50.0               # for LLM_PROVIDER=openai

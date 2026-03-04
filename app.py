@@ -138,6 +138,46 @@ CONFIG_SECTIONS = [
         ],
     },
     {
+        "id": "bilibili",
+        "title": "Bilibili",
+        "icon": "bi-play-btn",
+        "fields": [
+            {
+                "key": "BILIBILI_ENABLED",
+                "label": "Enable Bilibili",
+                "type": "checkbox",
+                "default": "false",
+                "help": "Monitor Bilibili user spaces for new videos",
+            },
+            {
+                "key": "BILIBILI_USERS",
+                "label": "User IDs",
+                "type": "text",
+                "placeholder": "12345,67890",
+                "help": "Comma-separated numeric UIDs (from user profile URLs)",
+            },
+            {
+                "key": "BILIBILI_SESSDATA",
+                "label": "SESSDATA Cookie",
+                "type": "password",
+                "placeholder": "Browser cookie for Bilibili auth",
+                "help": "Get from browser DevTools after logging into bilibili.com",
+            },
+            {
+                "key": "BILIBILI_BILI_JCT",
+                "label": "bili_jct Cookie",
+                "type": "password",
+                "placeholder": "CSRF token cookie",
+            },
+            {
+                "key": "BILIBILI_BUVID3",
+                "label": "buvid3 Cookie",
+                "type": "password",
+                "placeholder": "Device identifier cookie",
+            },
+        ],
+    },
+    {
         "id": "llm",
         "title": "LLM Provider",
         "icon": "bi-robot",
@@ -477,11 +517,17 @@ def dashboard():
     channels = env.get("YOUTUBE_CHANNELS", "")
     channel_count = len([c for c in channels.split(",") if c.strip()]) if channels else 0
 
+    bilibili_users = env.get("BILIBILI_USERS", "")
+    bilibili_count = len([u for u in bilibili_users.split(",") if u.strip()]) if bilibili_users else 0
+    bilibili_enabled = env.get("BILIBILI_ENABLED", "false").lower() in ("true", "1", "yes")
+
     search_queries = env.get("YOUTUBE_SEARCH_QUERIES", "")
     config_info = {
         "provider": env.get("LLM_PROVIDER", "gemini"),
         "channels": channels or "—",
         "search_queries": search_queries or "disabled",
+        "bilibili_enabled": bilibili_enabled,
+        "bilibili_users": bilibili_users or "—",
         "output_mode": env.get("OUTPUT_MODE", "email"),
         "languages": env.get("SUMMARY_LANGUAGES", "English"),
         "poll_interval": env.get("POLL_INTERVAL", "3600"),
@@ -495,6 +541,7 @@ def dashboard():
             "sent": sent,
             "failed": failed,
             "channels": channel_count,
+            "bilibili_users": bilibili_count if bilibili_enabled else 0,
         },
         recent=history[:10],
         config_info=config_info,
@@ -609,10 +656,10 @@ def view_summary(filename):
 # ── Entry point ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="YT Summarizer Web UI")
+    parser = argparse.ArgumentParser(description="Video Summarizer Web UI")
     parser.add_argument("--port", type=int, default=5000, help="Port (default 5000)")
     parser.add_argument("--host", default="127.0.0.1", help="Host (default 127.0.0.1)")
     args = parser.parse_args()
 
-    print(f"\n  YT Summarizer Web UI → http://{args.host}:{args.port}\n")
+    print(f"\n  Video Summarizer Web UI → http://{args.host}:{args.port}\n")
     app.run(host=args.host, port=args.port, debug=True)

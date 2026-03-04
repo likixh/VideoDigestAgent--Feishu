@@ -20,7 +20,7 @@ import sys
 
 import config
 from youtube_monitor import get_new_videos
-from transcript_extractor import get_transcript
+from transcript_extractor import get_transcript, get_bilibili_transcript
 from summarizer import summarize
 from emailer import send_summary_email
 from history import (
@@ -50,20 +50,25 @@ def _print_banner() -> None:
     verify = "on" if config.VERIFY_SUMMARY else "off"
 
     logger.info("=" * 60)
-    logger.info("YouTube Video Summarizer")
+    logger.info("Video Summarizer Agent")
     logger.info("-" * 60)
     logger.info("  LLM:        %s (%s)", provider, model_name)
-    logger.info("  Channels:   %s", channels)
+    logger.info("  YT Channels:%s", channels)
     if config.YOUTUBE_SEARCH_ENABLED:
         search_queries = ", ".join(config.YOUTUBE_SEARCH_QUERIES)
-        logger.info("  Search:     %s", search_queries)
+        logger.info("  YT Search:  %s", search_queries)
         logger.info("  Search int: every %d min", config.YOUTUBE_SEARCH_INTERVAL // 60)
         logger.info("  Quota:      %d units/day budget", config.YOUTUBE_SEARCH_QUOTA_BUDGET)
         logger.info("  Max total:  %d videos/cycle", config.YOUTUBE_SEARCH_MAX_TOTAL)
         logger.info("  Min views:  %s", f"{config.YOUTUBE_SEARCH_MIN_VIEWS:,}" if config.YOUTUBE_SEARCH_MIN_VIEWS > 0 else "off")
         logger.info("  Min length: %d min", config.YOUTUBE_SEARCH_MIN_DURATION)
     else:
-        logger.info("  Search:     disabled")
+        logger.info("  YT Search:  disabled")
+    if config.BILIBILI_ENABLED:
+        bili_users = ", ".join(config.BILIBILI_USERS) if config.BILIBILI_USERS else "none"
+        logger.info("  Bilibili:   enabled (%s)", bili_users)
+    else:
+        logger.info("  Bilibili:   disabled")
     logger.info("  Languages:  %s", languages)
     logger.info("  Output:     %s", config.OUTPUT_MODE)
     if config.OUTPUT_MODE in ("email", "both"):
@@ -112,6 +117,40 @@ def _fetch_video_metadata(video_id: str) -> dict:
     }
 
 
+def _fetch_bilibili_metadata(bvid: str) -> dict:
+    """Fetch video metadata from Bilibili by BV ID."""
+    try:
+        import asyncio
+        from bilibili_api import video
+
+        async def _fetch():
+            v = video.Video(bvid=bvid)
+            return await v.get_info()
+
+        info = asyncio.run(_fetch())
+        owner = info.get("owner", {})
+        return {
+            "video_id": f"bilibili:{bvid}",
+            "bvid": bvid,
+            "title": info.get("title", f"Bilibili {bvid}"),
+            "channel": owner.get("name", "unknown"),
+            "published_at": str(info.get("pubdate", "")),
+            "platform": "bilibili",
+            "source": "bilibili",
+        }
+    except Exception as e:
+        logger.warning("Could not fetch Bilibili metadata for %s: %s", bvid, e)
+        return {
+            "video_id": f"bilibili:{bvid}",
+            "bvid": bvid,
+            "title": f"Bilibili {bvid}",
+            "channel": "unknown",
+            "published_at": "",
+            "platform": "bilibili",
+            "source": "bilibili",
+        }
+
+
 def process_video(video: dict, dry_run: bool = False) -> None:
     """Process a single video: extract transcript, summarize, email, mark done."""
     vid_id = video["video_id"]
@@ -119,54 +158,69 @@ def process_video(video: dict, dry_run: bool = False) -> None:
     channel = video.get("channel", "unknown")
     published_at = video.get("published_at", "")
     source = video.get("source", "channel")
+    platform = video.get("platform", "youtube")
 
     if source == "search":
         source_label = f"search:'{video.get('search_query', '?')}'"
+    elif platform == "bilibili":
+        source_label = f"bilibili:{channel}"
     else:
         source_label = f"@{channel}"
     logger.info("Processing: %s (%s) from %s", title, vid_id, source_label)
 
     try:
-        transcript = get_transcript(vid_id)
+        if platform == "bilibili":
+            bvid = video.get("bvid") or vid_id.replace("bilibili:", "")
+            transcript = get_bilibili_transcript(bvid)
+        else:
+            transcript = get_transcript(vid_id)
     except RuntimeError as e:
         logger.warning("Skipping %s — %s", vid_id, e)
-        mark_failed(vid_id, title, channel, str(e), source=source)
+        mark_failed(vid_id, title, channel, str(e), source=source, platform=platform)
         return False
 
     try:
         summaries, content_type = summarize(title, transcript)
     except Exception as e:
         logger.error("Summarization failed for %s: %s", vid_id, e)
-        mark_failed(vid_id, title, channel, str(e), source=source)
+        mark_failed(vid_id, title, channel, str(e), source=source, platform=platform)
         return False
 
     # ── Deliver output based on OUTPUT_MODE ────────────────────────
     email_err = None
     if config.OUTPUT_MODE in ("email", "both") and not dry_run:
         try:
-            send_summary_email(title, vid_id, summaries, channel, content_type)
+            send_summary_email(
+                title, vid_id, summaries, channel, content_type,
+                platform=platform,
+            )
         except Exception as e:
             logger.error("Email failed for %s: %s", vid_id, e)
             email_err = e
 
     if config.OUTPUT_MODE in ("local", "both") or email_err is not None:
-        save_summary_to_file(vid_id, title, channel, summaries)
+        save_summary_to_file(vid_id, title, channel, summaries, platform=platform)
 
     if email_err is not None:
         # Print to terminal as fallback
-        video_url = f"https://www.youtube.com/watch?v={vid_id}"
+        if platform == "bilibili":
+            bvid = vid_id.replace("bilibili:", "")
+            video_url = f"https://www.bilibili.com/video/{bvid}"
+        else:
+            video_url = f"https://www.youtube.com/watch?v={vid_id}"
         print(f"\n{'='*60}")
         print(f"EMAIL FAILED — printing summary for: {title}")
-        print(f"Channel: @{channel}  |  {video_url}")
+        print(f"Channel: {channel}  |  {video_url}")
         print(f"{'='*60}")
         for lang, summary in summaries.items():
             print(f"\n--- {lang} ---\n")
             print(summary)
         print(f"\n{'='*60}\n")
-        mark_failed(vid_id, title, channel, f"email: {email_err}", source=source)
+        mark_failed(vid_id, title, channel, f"email: {email_err}", source=source,
+                     platform=platform)
         return False
 
-    mark_sent(vid_id, title, channel, source=source)
+    mark_sent(vid_id, title, channel, source=source, platform=platform)
     logger.info("Done: %s", title)
     return True
 
@@ -175,16 +229,25 @@ def process_video(video: dict, dry_run: bool = False) -> None:
 
 def run_once(dry_run: bool = False) -> int:
     """Check for new videos and process them. Returns count of videos processed."""
-    new_videos = get_new_videos()
-    if not new_videos:
+    all_videos = []
+
+    # YouTube videos
+    if config.YOUTUBE_CHANNELS or config.YOUTUBE_SEARCH_ENABLED:
+        all_videos.extend(get_new_videos())
+
+    # Bilibili videos
+    if config.BILIBILI_ENABLED:
+        from bilibili_monitor import get_new_videos as get_bilibili_videos
+        all_videos.extend(get_bilibili_videos())
+
+    if not all_videos:
         logger.info("No new videos found.")
         return 0
 
-    count = 0
-    for video in new_videos:
+    for video in all_videos:
         process_video(video, dry_run=dry_run)
 
-    return len(new_videos)
+    return len(all_videos)
 
 
 def run_poll(dry_run: bool = False) -> None:
@@ -205,21 +268,36 @@ def run_poll(dry_run: bool = False) -> None:
 
 
 def run_single_video(video_id: str, dry_run: bool = False) -> None:
-    """Process a specific video by ID (for testing)."""
-    metadata = _fetch_video_metadata(video_id)
-    video = {
-        "video_id": video_id,
-        "title": metadata["title"],
-        "channel": metadata["channel"],
-        "published_at": metadata["published_at"],
-    }
-    logger.info("Fetched metadata — title: %s, channel: %s", video["title"], video["channel"])
+    """Process a specific video by ID (for testing).
+
+    Supports both YouTube video IDs and Bilibili BV IDs (prefix with BV).
+    """
+    if video_id.startswith("BV"):
+        # Bilibili video
+        video = _fetch_bilibili_metadata(video_id)
+        logger.info("Fetched Bilibili metadata — title: %s, channel: %s",
+                     video["title"], video["channel"])
+    else:
+        # YouTube video
+        metadata = _fetch_video_metadata(video_id)
+        video = {
+            "video_id": video_id,
+            "title": metadata["title"],
+            "channel": metadata["channel"],
+            "published_at": metadata["published_at"],
+        }
+        logger.info("Fetched metadata — title: %s, channel: %s",
+                     video["title"], video["channel"])
     process_video(video, dry_run=dry_run)
 
 
 def run_check() -> None:
     """Validate configuration and exit."""
     _print_banner()
+    if config.BILIBILI_ENABLED and not config.BILIBILI_USERS:
+        logger.warning("Bilibili is enabled but no users are configured (BILIBILI_USERS).")
+    if config.BILIBILI_ENABLED and not (config.BILIBILI_SESSDATA and config.BILIBILI_BILI_JCT):
+        logger.warning("Bilibili cookies not set — subtitle extraction may fail.")
     logger.info("Config validation passed — all required settings are present.")
 
 
@@ -232,20 +310,25 @@ def run_history() -> None:
 
     # Header
     print()
-    print(f"  {'Date':<18} {'Channel':<18} {'Status':<8} {'Title'}")
-    print(f"  {'─'*18} {'─'*18} {'─'*8} {'─'*40}")
+    print(f"  {'Date':<18} {'Platform':<10} {'Channel':<18} {'Status':<8} {'Title'}")
+    print(f"  {'─'*18} {'─'*10} {'─'*18} {'─'*8} {'─'*34}")
 
     status_icons = {"sent": "sent", "failed": "FAIL", "init": "seen"}
 
     for item in items:
         date = item.get("date", "—")
-        channel = f"@{item.get('channel', '?')}" if item.get("channel") else "—"
+        platform = item.get("platform", "youtube")
+        channel = item.get("channel", "?") or "?"
+        if platform == "youtube" and channel != "?":
+            channel = f"@{channel}"
+        elif not channel:
+            channel = "—"
         status = status_icons.get(item.get("status", ""), "?")
         title = item.get("title", "—") or "—"
         # Truncate long titles
-        if len(title) > 50:
-            title = title[:47] + "..."
-        print(f"  {date:<18} {channel:<18} {status:<8} {title}")
+        if len(title) > 44:
+            title = title[:41] + "..."
+        print(f"  {date:<18} {platform:<10} {channel:<18} {status:<8} {title}")
 
     # Summary
     total = len(items)
@@ -264,11 +347,16 @@ def run_retry() -> None:
 
     print(f"Retrying {len(failed)} failed video(s)...\n")
     for item in failed:
+        platform = item.get("platform", "youtube")
         video = {
             "video_id": item["video_id"],
             "title": item.get("title", f"Video {item['video_id']}"),
             "channel": item.get("channel", "unknown"),
+            "platform": platform,
+            "source": item.get("source", "channel"),
         }
+        if platform == "bilibili":
+            video["bvid"] = item["video_id"].replace("bilibili:", "")
         process_video(video)
 
 
@@ -276,7 +364,7 @@ def run_retry() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="YouTube Video Summarizer"
+        description="Video Summarizer Agent (YouTube + Bilibili)"
     )
     parser.add_argument(
         "--poll", action="store_true",
@@ -284,7 +372,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--video", type=str,
-        help="Process a specific video by ID",
+        help="Process a specific video by ID (YouTube ID or Bilibili BV ID)",
     )
     parser.add_argument(
         "--history", action="store_true",
