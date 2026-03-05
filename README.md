@@ -1,16 +1,19 @@
-# YouTube Video Summarizer
+# Video Digest Agent
 
-Automatically monitors YouTube channels for new videos, extracts transcripts, **auto-detects the content type** (stocks, crypto, podcast, tech review, education, news, etc.), generates tailored summaries using your choice of LLM (Gemini, OpenAI, or Claude), and delivers them via email, local file, or both.
+Automatically monitors **YouTube channels**, **YouTube keyword searches**, and **Bilibili user spaces** for new videos, extracts transcripts, **auto-detects the content type** (stocks, crypto, podcast, tech review, education, news, etc.), generates tailored summaries using your choice of LLM (Gemini, OpenAI, or Claude), and delivers them via email, local file, or both.
+
+Includes a **web UI** for point-and-click configuration and one-click runs, as well as a CLI for automation and scripting.
 
 ## How It Works
 
 The app uses an **agent-based pipeline** to produce accurate, content-aware summaries:
 
 ```
-1. CLASSIFY  — Detects video type (stock analysis? podcast? tutorial?)
-2. PROMPT    — Selects the best summary template for that content type
-3. SUMMARIZE — Generates a structured summary via LLM
-4. VERIFY    — (Optional) Second LLM pass to catch errors & hallucinations
+1. DISCOVER  — Fetches new uploads from YouTube channels, search results, or Bilibili users
+2. CLASSIFY  — Detects video type (stock analysis? podcast? tutorial?)
+3. PROMPT    — Selects the best summary template for that content type
+4. SUMMARIZE — Generates a structured summary via LLM
+5. VERIFY    — (Optional) Second LLM pass to catch errors & hallucinations
 ```
 
 ## Supported Content Types
@@ -30,7 +33,7 @@ The app uses an **agent-based pipeline** to produce accurate, content-aware summ
 
 ### 1. Get API Keys
 
-#### YouTube Data API v3 Key (required)
+#### YouTube Data API v3 Key (required for YouTube sources)
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project (or select an existing one)
 3. Go to **APIs & Services > Library**
@@ -79,16 +82,14 @@ cp .env.example .env
 Edit `.env` with your actual values:
 
 ```env
-# Add your YouTube channels (comma-separated, without @)
-YOUTUBE_CHANNELS=RhinoFinance,MeetKevin,MrBeast
+# YouTube channels to monitor (comma-separated, without @)
+YOUTUBE_CHANNELS=RhinoFinance,MeetKevin
 
 YOUTUBE_API_KEY=AIza...
 
 # Pick your LLM: gemini, openai, or anthropic
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=AIza...
-# Fallback models if primary hits quota (optional)
-# GEMINI_FALLBACK_MODELS=gemini-3-pro-preview,gemini-3-flash-preview,gemini-2.5-pro,gemini-2.5-flash,gemini-2.5-flash-lite
 
 # Summary languages (up to 2)
 SUMMARY_LANGUAGES=English,Chinese
@@ -107,41 +108,114 @@ RECIPIENT_EMAILS=you@gmail.com
 
 ## Usage
 
-### Check once for new videos
+### Web UI
+
+```bash
+python3 app.py
+```
+
+Opens a dashboard at `http://127.0.0.1:5000` with:
+- **Dashboard** — live stats, recent history, config overview
+- **Run** — trigger once, poll, test a specific video, retry failed, or validate config
+- **Config** — edit all settings through a form (no manual `.env` editing required)
+- **Archive** — browse and read saved summary files
+
+```bash
+python3 app.py --port 8080 --host 0.0.0.0   # custom port / expose to network
+```
+
+### CLI
+
+#### Check once for new videos
 ```bash
 python3 main.py
 ```
 
-### Run continuously (checks every hour)
+#### Run continuously (checks every hour)
 ```bash
 python3 main.py --poll
 ```
 
-### Test with a specific video
+#### Test with a specific video
 ```bash
+# YouTube video
 python3 main.py --video dQw4w9WgXcQ
+
+# Bilibili video (prefix BV IDs are detected automatically)
+python3 main.py --video BV1xx411c7XZ
 ```
 
-### Dry run (no email sent — prints summary to stdout)
+#### Dry run (no email sent — prints summary to stdout)
 ```bash
 python3 main.py --video dQw4w9WgXcQ --dry-run
 ```
 
-### Validate your configuration
+#### Validate your configuration
 ```bash
 python3 main.py --check
 ```
 
+#### Show processing history
+```bash
+python3 main.py --history
+```
+
+#### Retry previously failed videos
+```bash
+python3 main.py --retry
+```
+
+## Video Sources
+
+### YouTube Channels
+
+Set `YOUTUBE_CHANNELS` to a comma-separated list of channel handles (without `@`). The agent resolves handles to channel IDs and caches them locally to minimise API usage.
+
+### YouTube Keyword Search
+
+Set `YOUTUBE_SEARCH_QUERIES` to discover new videos beyond your subscribed channels:
+
+```env
+YOUTUBE_SEARCH_QUERIES=AI news,machine learning,LLM
+YOUTUBE_SEARCH_MAX_RESULTS=5          # results per query
+YOUTUBE_SEARCH_INTERVAL=14400         # search every 4 hours (seconds)
+YOUTUBE_SEARCH_QUOTA_BUDGET=5000      # max API units/day for search
+YOUTUBE_SEARCH_RELEVANCE_KEYWORDS=AI,LLM,GPT   # title pre-filter
+YOUTUBE_SEARCH_MIN_DURATION=10        # skip clips shorter than N minutes
+YOUTUBE_SEARCH_MAX_TOTAL=15           # cap total videos per search cycle
+YOUTUBE_SEARCH_MIN_VIEWS=1000         # skip low-traffic videos (0 = off)
+```
+
+Keyword search uses the YouTube Search API (100 units/call). The daily free tier is 10,000 units total across all API calls.
+
+### Bilibili
+
+Monitor Bilibili user spaces for new uploads. Requires browser cookies for subtitle/transcript access:
+
+```env
+BILIBILI_ENABLED=true
+BILIBILI_USERS=12345,67890            # numeric UIDs from profile URLs
+BILIBILI_SESSDATA=...                 # get from browser DevTools
+BILIBILI_BILI_JCT=...
+BILIBILI_BUVID3=...
+```
+
+To get the cookies: open [bilibili.com](https://www.bilibili.com), log in, open DevTools (F12) → Application → Cookies, and copy the values for `SESSDATA`, `bili_jct`, and `buvid3`.
+
+Bilibili support requires the optional `bilibili-api-python` and `httpx` packages (included in `requirements.txt`).
+
 ## Configuration Reference
+
+### Core
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `YOUTUBE_CHANNELS` | Yes | — | Comma-separated channel handles (without @) |
-| `YOUTUBE_API_KEY` | Yes | — | YouTube Data API v3 key |
+| `YOUTUBE_CHANNELS` | One source required | — | Comma-separated channel handles (without @) |
+| `YOUTUBE_API_KEY` | If YouTube enabled | — | YouTube Data API v3 key |
 | `LLM_PROVIDER` | No | `gemini` | LLM to use: `gemini`, `openai`, or `anthropic` |
 | `GEMINI_API_KEY` | If gemini | — | Google Gemini API key |
 | `GEMINI_MODEL` | No | `gemini-3.1-pro-preview` | Gemini model to use |
-| `GEMINI_FALLBACK_MODELS` | No | `gemini-3-pro-preview,gemini-3-flash-preview,gemini-2.5-pro,gemini-2.5-flash,gemini-2.5-flash-lite` | Fallback models when primary hits quota (comma-separated, in order) |
+| `GEMINI_FALLBACK_MODELS` | No | see `.env.example` | Fallback model chain when primary hits quota |
 | `OPENAI_API_KEY` | If openai | — | OpenAI API key |
 | `OPENAI_MODEL` | No | `gpt-4o-mini` | OpenAI model to use |
 | `ANTHROPIC_API_KEY` | If anthropic | — | Anthropic API key |
@@ -156,6 +230,29 @@ python3 main.py --check
 | `RECIPIENT_EMAILS` | If email/both | — | Email(s) to send summaries to (comma-separated) |
 | `POLL_INTERVAL` | No | `3600` | Seconds between checks |
 
+### YouTube Search
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `YOUTUBE_SEARCH_QUERIES` | No | — | Comma-separated search terms; leave empty to disable |
+| `YOUTUBE_SEARCH_MAX_RESULTS` | No | `5` | Results per search query (1–50) |
+| `YOUTUBE_SEARCH_INTERVAL` | No | `14400` | Seconds between search runs |
+| `YOUTUBE_SEARCH_QUOTA_BUDGET` | No | `5000` | Max YouTube API units for search per day |
+| `YOUTUBE_SEARCH_RELEVANCE_KEYWORDS` | No | see `.env.example` | Title pre-filter keywords |
+| `YOUTUBE_SEARCH_MIN_DURATION` | No | `10` | Skip videos shorter than N minutes |
+| `YOUTUBE_SEARCH_MAX_TOTAL` | No | `15` | Max total search results processed per cycle |
+| `YOUTUBE_SEARCH_MIN_VIEWS` | No | `1000` | Skip videos with fewer views (0 = off) |
+
+### Bilibili
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `BILIBILI_ENABLED` | No | `false` | Enable Bilibili monitoring |
+| `BILIBILI_USERS` | If enabled | — | Comma-separated numeric UIDs |
+| `BILIBILI_SESSDATA` | If enabled | — | Browser cookie for auth |
+| `BILIBILI_BILI_JCT` | If enabled | — | CSRF token cookie |
+| `BILIBILI_BUVID3` | If enabled | — | Device identifier cookie |
+
 ## Run as a Background Service (Optional)
 
 ### Using cron (simplest)
@@ -166,21 +263,21 @@ crontab -e
 
 Add this line to check every hour:
 ```
-0 * * * * cd /path/to/youtubersummary && /usr/bin/python3 main.py >> /tmp/yt-summarizer.log 2>&1
+0 * * * * cd /path/to/VideoDigestAgent && /usr/bin/python3 main.py >> /tmp/video-digest.log 2>&1
 ```
 
 ### Using systemd (Linux)
 
-Create `/etc/systemd/system/yt-summarizer.service`:
+Create `/etc/systemd/system/video-digest.service`:
 
 ```ini
 [Unit]
-Description=YouTube Video Summarizer
+Description=Video Digest Agent
 After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/path/to/youtubersummary
+WorkingDirectory=/path/to/VideoDigestAgent
 ExecStart=/usr/bin/python3 main.py --poll
 Restart=always
 RestartSec=30
@@ -191,25 +288,27 @@ WantedBy=multi-user.target
 
 Then:
 ```bash
-sudo systemctl enable yt-summarizer
-sudo systemctl start yt-summarizer
+sudo systemctl enable video-digest
+sudo systemctl start video-digest
 ```
 
 ## Architecture
 
 ```
-main.py                  — Orchestrator: CLI + polling loop
-youtube_monitor.py       — Detects new uploads via YouTube Data API (multi-channel)
-transcript_extractor.py  — Extracts captions (YouTube API → Whisper fallback)
+app.py                   — Flask web UI (dashboard, config editor, archive viewer)
+main.py                  — CLI orchestrator: argument parsing + polling loop
+youtube_monitor.py       — Detects new uploads via YouTube Data API; keyword search
+bilibili_monitor.py      — Detects new uploads from Bilibili user spaces
+transcript_extractor.py  — Extracts captions (YouTube API → Whisper fallback; Bilibili subtitles)
 summarizer.py            — Agent pipeline: classify → prompt → summarize → verify
 emailer.py               — Formats and sends summary email via SMTP
 history.py               — Tracks processed videos + saves summaries locally
-config.py                — Loads settings from .env (incl. OUTPUT_MODE)
+config.py                — Loads and validates all settings from .env
 ```
 
 ## Cost Estimate
 
-Each video goes through 2-3 LLM calls (classify + summarize, optionally + verify):
+Each video goes through 2–3 LLM calls (classify + summarize, optionally + verify):
 
 | | Gemini | OpenAI | Anthropic |
 |---|---|---|---|
@@ -217,5 +316,5 @@ Each video goes through 2-3 LLM calls (classify + summarize, optionally + verify
 | With verification | Free | ~$0.04/video | ~$0.04/video |
 | Per extra language | Free | ~$0.02/video | ~$0.02/video |
 
-- **YouTube Data API**: Free tier (10,000 units/day, each poll ~4 units/channel)
+- **YouTube Data API**: Free tier (10,000 units/day; channel polling ~4 units/channel/check; search ~100 units/call)
 - **Email**: Free via Gmail SMTP (or skip email entirely with `OUTPUT_MODE=local`)
