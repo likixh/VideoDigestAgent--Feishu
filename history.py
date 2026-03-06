@@ -118,6 +118,15 @@ def get_history() -> list[dict]:
     return items
 
 
+def _get_model_name() -> str:
+    return {
+        "gemini": getattr(config, "GEMINI_MODEL", ""),
+        "openai": getattr(config, "OPENAI_MODEL", ""),
+        "anthropic": getattr(config, "ANTHROPIC_MODEL", ""),
+        "openrouter": getattr(config, "OPENROUTER_MODEL", ""),
+    }.get(config.LLM_PROVIDER, "")
+
+
 def save_summary_to_file(
     video_id: str, title: str, channel: str, summaries: dict[str, str],
     platform: str = "youtube",
@@ -145,6 +154,7 @@ def save_summary_to_file(
         f"- **Channel:** {channel}",
         f"- **Link:** {video_url}",
         f"- **Date:** {date_str}",
+        f"- **Model:** {config.LLM_PROVIDER} / {_get_model_name()}",
         f"",
     ]
 

@@ -42,6 +42,7 @@ def _print_banner() -> None:
         "gemini": getattr(config, "GEMINI_MODEL", ""),
         "openai": getattr(config, "OPENAI_MODEL", ""),
         "anthropic": getattr(config, "ANTHROPIC_MODEL", ""),
+        "openrouter": getattr(config, "OPENROUTER_MODEL", ""),
     }.get(provider, "")
 
     channels = ", ".join(f"@{ch}" for ch in config.YOUTUBE_CHANNELS) if config.YOUTUBE_CHANNELS else "none"

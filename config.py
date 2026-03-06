@@ -86,7 +86,7 @@ if not YOUTUBE_CHANNELS and not YOUTUBE_SEARCH_ENABLED and not BILIBILI_ENABLED:
 # ── LLM Provider ────────────────────────────────────────
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").lower()
 
-_VALID_PROVIDERS = ("gemini", "openai", "anthropic")
+_VALID_PROVIDERS = ("gemini", "openai", "anthropic", "openrouter")
 if LLM_PROVIDER not in _VALID_PROVIDERS:
     print(
         f"Error: Unknown LLM_PROVIDER '{LLM_PROVIDER}'. "
@@ -114,6 +114,9 @@ try:
     elif LLM_PROVIDER == "anthropic":
         ANTHROPIC_API_KEY = _require_for_provider("ANTHROPIC_API_KEY", "anthropic")
         ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929")
+    elif LLM_PROVIDER == "openrouter":
+        OPENROUTER_API_KEY = _require_for_provider("OPENROUTER_API_KEY", "openrouter")
+        OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
 except RuntimeError as e:
     print(f"Error: {e}", file=sys.stderr)
     print(

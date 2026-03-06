@@ -351,6 +351,26 @@ def _llm_call(system_prompt: str, user_message: str) -> str:
         )
         return response.content[0].text
 
+    elif provider == "openrouter":
+        from openai import OpenAI
+
+        client = OpenAI(
+            api_key=config.OPENROUTER_API_KEY,
+            base_url="https://openrouter.ai/api/v1",
+        )
+        try:
+            response = client.chat.completions.create(
+                model=config.OPENROUTER_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message},
+                ],
+            )
+            return response.choices[0].message.content
+        except Exception as exc:
+            logger.error("OpenRouter API call failed: %s", exc)
+            raise
+
 
 # ── Agent pipeline ───────────────────────────────────────────────────────────
 
