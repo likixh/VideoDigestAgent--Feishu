@@ -114,6 +114,11 @@ RECIPIENT_EMAILS=you@gmail.com
 python3 app.py
 ```
 
+> **macOS — port 5000 already in use?** macOS Monterey and later runs AirPlay Receiver on port 5000 by default. Either disable it (**System Settings → General → AirDrop & Handoff → AirPlay Receiver → off**) or use a different port:
+> ```bash
+> python3 app.py --port 8080
+> ```
+
 Opens a dashboard at `http://127.0.0.1:5000` with:
 - **Dashboard** — live stats, recent history, config overview
 - **Run** — trigger once, poll, test a specific video, retry failed, or validate config
