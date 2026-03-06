@@ -193,6 +193,7 @@ def process_video(video: dict, dry_run: bool = False) -> None:
             send_summary_email(
                 title, vid_id, summaries, channel, content_type,
                 platform=platform,
+                transcript=transcript,
             )
         except Exception as e:
             logger.error("Email failed for %s: %s", vid_id, e)
