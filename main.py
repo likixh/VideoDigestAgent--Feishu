@@ -23,6 +23,7 @@ from youtube_monitor import get_new_videos
 from transcript_extractor import get_transcript, get_bilibili_transcript
 from summarizer import summarize
 from emailer import send_summary_email
+from feishu import send_feishu_notification
 from history import (
     mark_sent, mark_failed, get_failed_videos, get_history,
     get_processed_ids, save_summary_to_file,
@@ -74,6 +75,8 @@ def _print_banner() -> None:
     logger.info("  Output:     %s", config.OUTPUT_MODE)
     if config.OUTPUT_MODE in ("email", "both"):
         logger.info("  Recipients: %s", recipients)
+    if config.OUTPUT_MODE == "feishu":
+        logger.info("  Feishu:    webhook configured" if config.FEISHU_WEBHOOK_URL else "  Feishu:    no webhook set")
     logger.info("  Verify:     %s", verify)
     logger.info("  Poll:       every %d min", config.POLL_INTERVAL // 60)
     logger.info("=" * 60)
@@ -199,8 +202,19 @@ def process_video(video: dict, dry_run: bool = False) -> None:
         except Exception as e:
             logger.error("Email failed for %s: %s", vid_id, e)
             email_err = e
+    feishu_err = None
+    if config.OUTPUT_MODE == "feishu" and not dry_run:
+        try:
+            send_feishu_notification(
+                title, vid_id, summaries, channel, content_type,
+                published_at=published_at,
+                platform=platform,
+            )
+        except Exception as e:
+            logger.error("Feishu failed for %s: %s", vid_id, e)
+            feishu_err = e
 
-    if config.OUTPUT_MODE in ("local", "both") or email_err is not None:
+    if config.OUTPUT_MODE in ("local", "both") or email_err is not None or feishu_err is not None:
         save_summary_to_file(vid_id, title, channel, summaries, platform=platform)
 
     if email_err is not None:
@@ -220,6 +234,9 @@ def process_video(video: dict, dry_run: bool = False) -> None:
         print(f"\n{'='*60}\n")
         mark_failed(vid_id, title, channel, f"email: {email_err}", source=source,
                      platform=platform)
+        return False
+    if feishu_err is not None:
+        mark_failed(vid_id, title, channel, f"feishu: {feishu_err}", source=source, platform=platform)
         return False
 
     mark_sent(vid_id, title, channel, source=source, platform=platform)
@@ -300,6 +317,8 @@ def run_check() -> None:
         logger.warning("Bilibili is enabled but no users are configured (BILIBILI_USERS).")
     if config.BILIBILI_ENABLED and not (config.BILIBILI_SESSDATA and config.BILIBILI_BILI_JCT):
         logger.warning("Bilibili cookies not set — subtitle extraction may fail.")
+    if config.OUTPUT_MODE == "feishu" and not config.FEISHU_WEBHOOK_URL:
+        logger.warning("OUTPUT_MODE is 'feishu' but FEISHU_WEBHOOK_URL is not set.")
     logger.info("Config validation passed — all required settings are present.")
 
 

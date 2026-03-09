@@ -145,7 +145,7 @@ VERIFY_SUMMARY = os.getenv("VERIFY_SUMMARY", "false").lower() in ("true", "1", "
 # "local" — save markdown file only (no email credentials needed)
 # "both"  — send email AND save locally
 OUTPUT_MODE = os.getenv("OUTPUT_MODE", "email").lower()
-_VALID_OUTPUT_MODES = ("email", "local", "both")
+_VALID_OUTPUT_MODES = ("email", "local", "both", "feishu")
 if OUTPUT_MODE not in _VALID_OUTPUT_MODES:
     print(
         f"Error: Unknown OUTPUT_MODE '{OUTPUT_MODE}'. "
@@ -194,3 +194,8 @@ SEARCH_STATE_FILE = os.path.join(
 CHANNEL_CACHE_FILE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "channel_cache.json"
 )
+
+# ── Feishu ──────────────────────────────────────────────
+FEISHU_WEBHOOK_URL = os.getenv("FEISHU_WEBHOOK_URL", "")
+FEISHU_SECRET = os.getenv("FEISHU_SECRET", "")
+
