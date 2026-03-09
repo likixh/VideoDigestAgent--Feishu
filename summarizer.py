@@ -221,6 +221,7 @@ What this means going forward — consequences, next steps, what to watch.
 """,
 }
 
+
 GENERAL_PROMPT = """\
 You are an expert content analyst. Summarize this video comprehensively.
 
