@@ -423,6 +423,8 @@ def _add_language(prompt: str, language: str) -> str:
     return (
         prompt
         + f"\n\nIMPORTANT: Write the ENTIRE summary in {language}. "
+        f"If the language is Simplified Chinese, you MUST use Simplified Chinese characters (简体中文) only — "
+        f"do NOT use Traditional Chinese characters (繁體中文) under any circumstances. "
         f"Keep proper nouns, tickers, and technical terms in their original form "
         f"but write all analysis, headings, and descriptions in {language}."
     )

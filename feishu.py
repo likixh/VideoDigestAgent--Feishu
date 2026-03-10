@@ -22,6 +22,8 @@ def _sign(secret: str, timestamp: str) -> str:
 
 def _clean_inline(text: str) -> str:
     """Remove inline markdown: bold, italic, code, links."""
+    if not text:
+        return ""
     text = re.sub(r"\*{1,3}(.+?)\*{1,3}", r"\1", text)
     text = re.sub(r"`([^`]+)`", r"\1", text)
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
@@ -103,7 +105,7 @@ def _extract_stock_details(text: str) -> list[dict]:
         block = m.group(3)
 
         def _field(label):
-            fm = re.search(rf"\*{{0,2}}{label}\*{{0,2}}\s*:\s*(.+?)(?=\n\s*[-*]|\n\*{{0,2}}|\Z)",
+            fm = re.search(rf"\*{{0,2}}(?:{label})\*{{0,2}}\s*:\s*(.+?)(?=\n\s*[-*]|\n\*{{0,2}}|\Z)",
                            block, re.IGNORECASE | re.DOTALL)
             return _clean_inline(fm.group(1).strip().split("\n")[0]) if fm else ""
 
