@@ -132,154 +132,70 @@ def _format_finance(
     sentiment = _extract_sentiment(summary)
     if sentiment:
         lines += ["", f"📊 {sentiment}", ""]
-        # Remove sentiment line from summary to prevent duplication in fallback
         summary = re.sub(
             r"\*{0,2}(?:Sentiment|Outlook)\s*:\s*\d+/10[^\n]*\*{0,2}\n?",
             "", summary, flags=re.IGNORECASE
         )
 
-    # ── Stock / Crypto tickers overview ─────────────
-    if content_type in ("stock_analysis", "crypto"):
-        tickers = _extract_tickers(summary)
-        if tickers:
-            lines.append("🏷 涉及标的")
-            lines.append("  " + " · ".join(tickers))
-            lines.append("")
-
-        # Per-stock detail blocks
-        stocks = _extract_stock_details(summary)
-        for s in stocks:
-            lines.append(f"📌 {s['ticker']} — {s['name']}")
-            if s["conviction"]:
-                lines.append(f"  信心：{s['conviction']}")
-            if s["bull"]:
-                lines.append(f"  多头：{s['bull'][:80]}")
-            if s["bear"]:
-                lines.append(f"  空头：{s['bear'][:80]}")
-            if s["target"]:
-                lines.append(f"  目标价：{s['target'][:60]}")
-            if s["takeaway"]:
-                lines.append(f"  结论：{s['takeaway'][:80]}")
-            lines.append("")
-
-    # ── Macro indicators ────────────────────────────
-    if content_type == "macro_economics":
-        indicators = _extract_bullets(summary, "Key Economic Indicators", "关键经济指标")
-        if indicators:
-            lines.append("📈 关键经济指标")
-            lines += _bullet_lines(indicators)
-            lines.append("")
-
-        policy = _extract_section(summary, "Central Bank", "Policy", "央行", "货币政策", "政策")
-        if policy:
-            first_line = _clean_inline(policy.split("\n")[0])
-            if first_line:
-                lines.append(f"🏦 央行政策")
-                lines.append(f"  {first_line[:120]}")
-                lines.append("")
-
-        sector = _extract_bullets(summary, "Sector", "Asset Class", "行业", "板块", "资产类别")
-        if sector:
-            lines.append("🎯 板块观点")
-            lines += _bullet_lines(sector)
-            lines.append("")
-
-    # ── News key facts ───────────────────────────────
-    if content_type == "news":
-        headline = _extract_section(summary, "Headline Summary")
-        if headline:
-            lines.append(_clean_inline(headline.split("\n")[0])[:150])
-            lines.append("")
-
-        facts = _extract_bullets(summary, "Key Facts", "关键事实")
-        if facts:
-            lines.append("📰 关键事实")
-            lines += _bullet_lines(facts)
-            lines.append("")
-
-        implications = _extract_bullets(summary, "Implications", "影响", "展望")
-        if implications:
-            lines.append("🔮 影响与展望")
-            lines += _bullet_lines(implications)
-            lines.append("")
-
-    # ── Podcast / Interview ──────────────────────────
-    if content_type == "podcast_interview":
-        guests = _extract_section(summary, "Guests", "Context", "嘉宾", "背景")
-        if guests:
-            first = _clean_inline(guests.split("\n")[0])
-            if first:
-                lines.append(f"🎙 嘉宾：{first[:100]}")
-                lines.append("")
-
-        contrarian = _extract_bullets(summary, "Surprising", "Contrarian",  "反常识", "出人意料")
-        if contrarian:
-            lines.append("💥 反常识观点")
-            lines += _bullet_lines(contrarian)
-            lines.append("")
-
-    # ── Actionable Takeaways (all finance types) ─────
+    # ── Actionable Takeaways ─────────────────────────
     actionable = _extract_bullets(
-        summary, "Actionable Takeaway", "Actionable", "Key Takeaway", "可操作", "行动建议", "投资建议", "操作建议"
+        summary, "Actionable Takeaway", "Actionable", "Key Takeaway",
+        "Other Key Information", "可操作", "行动建议", "投资建议", "其他关键信息"
     )
     if actionable:
         lines.append("✅ 可操作建议")
-        lines += _bullet_lines(actionable)
+        lines += _bullet_lines(actionable, max_len=150)
         lines.append("")
-
-    # ── Macro / Other info (stock type) ─────────────
-    if content_type in ("stock_analysis", "crypto"):
-        other = _extract_bullets(summary, "Other Key Information", "Macro", "其他", "宏观", "催化剂")
-        if other:
-            lines.append("🌍 宏观与催化剂")
-            lines += _bullet_lines(other)
-            lines.append("")
 
     # ── TL;DR ────────────────────────────────────────
     tldr = _extract_tldr(summary)
     if tldr:
-        lines += ["", "············ 💡 总结 ············", tldr]
+        lines += ["············ 💡 总结 ············", tldr]
 
-    # ── Fallback: if nothing was extracted, show clean plain text ───
-    content_lines = [l for l in lines if l and not l.startswith("━")]
+   # ── Fallback: re-extract using Chinese headings ──
+    content_lines = [l for l in lines if l]
     if len(content_lines) <= 2:
-        cleaned = summary
-        # Remove generic intro sentences
-        cleaned = re.sub(r"^这是一份.+?(?:总结|摘要)[。.]?\n?", "", cleaned, flags=re.MULTILINE)
-        cleaned = re.sub(r"^以下是.+?(?:总结|摘要)[：:。.]?\n?", "", cleaned, flags=re.MULTILINE)
-        cleaned = re.sub(r"^报告[：:]\s*\n?", "", cleaned, flags=re.MULTILINE)
-        # Headers
-        cleaned = re.sub(r"^#{1,6}\s+TL;DR.*$", r"\n💡 总结", cleaned, flags=re.MULTILINE | re.IGNORECASE)
-        cleaned = re.sub(r"^#{1,6}\s+(.+)$", r"\n▌\1", cleaned, flags=re.MULTILINE)
-        # Bold/italic (including trailing **)
-        cleaned = re.sub(r"\*{1,3}(.+?)\*{1,3}", r"\1", cleaned)
-        cleaned = re.sub(r"\*+", "", cleaned)
-        # Horizontal rules
-        cleaned = re.sub(r"^-{2,}$", "", cleaned, flags=re.MULTILINE)
-        # Bullet points — replace with emoji numbers per section
-        def _replace_bullets(m):
-            block = m.group(0)
-            items = re.findall(r"^[-*•]\s+(.+)$", block, flags=re.MULTILINE)
-            items = items[:3]  # max 3 per section
-            result = []
-            for i, item in enumerate(items):
-                emoji = _EMOJI_NUMBERS[i] if i < len(_EMOJI_NUMBERS) else "•"
-                result.append(f"  {emoji} {item}")
-            return "\n".join(result)
-        # Normalize Chinese-style bullets (3+ spaces + content) to standard bullets
-        cleaned = re.sub(r"^   +(\S)", r"- \1", cleaned, flags=re.MULTILINE)
-        cleaned = re.sub(r"((?:^[-*•]\s+.+\n?){1,})", _replace_bullets, cleaned, flags=re.MULTILINE)
-        # Numbered list items — keep only first 3
-        numbered = re.findall(r"^\d+\..+$", cleaned, flags=re.MULTILINE)
-        if len(numbered) > 3:
-            for item in numbered[3:]:
-                cleaned = cleaned.replace(item + "\n", "")
-        # Excessive blank lines
-        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
-        lines.append(cleaned.strip()[:2500])
+        # Sentiment
+        sentiment = _extract_sentiment(summary)
+        if sentiment:
+            lines += ["", f"📊 {sentiment}", ""]
 
+        # Actionable — try all possible Chinese/English headings
+        actionable = _extract_bullets(
+            summary,
+            "Actionable Takeaway", "Actionable", "Key Takeaway",
+            "Other Key Information", "其他关键信息",
+            "可操作", "行动建议", "投资建议",
+            "Detailed Stock Analysis", "详细股票分析",
+        )
+        if not actionable:
+            # Last resort: grab any bullet list in the summary
+            all_bullets = []
+            for line in summary.split("\n"):
+                line = line.strip()
+                if re.match(r"^[-*•]\s+", line) or re.match(r"^\d+[.)]\s+", line):
+                    cleaned = _clean_inline(re.sub(r"^[-*•\d.)]+\s+", "", line))
+                    if cleaned and len(cleaned) > 10:
+                        all_bullets.append(cleaned)
+            actionable = all_bullets[:5]
+
+        if actionable:
+            lines.append("✅ 要点")
+            lines += _bullet_lines(actionable, max_len=150)
+            lines.append("")
+
+        # TL;DR — try Chinese and English
+        tldr = _extract_tldr(summary)
+        if not tldr:
+            tldr_match = re.search(
+                r"##\s*(?:TL;DR|TLDR|总结|摘要)\s*\n(.*?)(?=\n##|\Z)",
+                summary, re.DOTALL | re.IGNORECASE
+            )
+            if tldr_match:
+                tldr = _clean_inline(tldr_match.group(1).strip()[:500])
+        if tldr:
+            lines += ["············ 💡 总结 ············", tldr]
     return lines
-
 
 def _format_message(
     video_title: str, video_id: str, summaries: dict,

@@ -59,8 +59,12 @@ For EACH stock discussed in detail:
 ## Other Key Information
 Macro data, sector trends, catalysts, earnings dates, Fed commentary.
 
+## Actionable Trades
+For each stock with a clear view, state the specific action:
+- **TICKER:** Buy / Sell / Long / Short / Avoid — one sentence reason and any price level mentioned
+
 ## TL;DR
-3-5 sentence executive summary.\
+1-5 sentence executive summary.\
 """,
 
     "macro_economics": """\
